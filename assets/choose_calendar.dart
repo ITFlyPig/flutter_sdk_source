@@ -76,7 +76,7 @@ class _ChooseCalendarState extends State<ChooseCalendar> {
   /// 月份对应的UI
   Widget _buildMonth(int index) {
     List<Widget> days = [];
-    DateTime dateTime = _dateMap[index];
+    DateTime? dateTime = _dateMap[index];
     //当前月份对应的天数
     int dayCount = DateTime(dateTime.year, dateTime.month + 1, 0).day;
     //计算最开始和最后一天分别是周几
