@@ -1,0 +1,11 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+participant 父Element as parent_element
+participant 子Element as child_element
+
+parent_element -> child_element:
+
+
+
+@enduml
