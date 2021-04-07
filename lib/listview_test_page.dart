@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/cache/WListView.dart';
 
 class ListViewTestPage extends StatefulWidget {
   @override
@@ -13,7 +12,7 @@ class _ListViewTestPageState extends State<ListViewTestPage> {
   void initState() {
     super.initState();
     _list = [];
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 50; i++) {
       _list?.add(i);
     }
   }
@@ -23,7 +22,7 @@ class _ListViewTestPageState extends State<ListViewTestPage> {
     return Material(
       child: Scaffold(
         body: Container(
-          child: WListView.builder(
+          child: ListView.builder(
             itemBuilder: (_, index) {
               return Container(
                 height: 200,

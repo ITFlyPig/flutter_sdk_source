@@ -583,8 +583,9 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement
             updateChild(newChildren[index], _build(index), index);
         if (newChild != null) {
           _childElements[index] = newChild;
-          final SliverMultiBoxAdaptorParentData parentData = newChild
-              .renderObject!.parentData! as SliverMultiBoxAdaptorParentData;
+          final SliverCacheMultiBoxAdaptorParentData parentData = newChild
+              .renderObject!
+              .parentData! as SliverCacheMultiBoxAdaptorParentData;
           if (index == 0) {
             parentData.layoutOffset = 0.0;
           } else if (indexToLayoutOffset.containsKey(index)) {
@@ -601,9 +602,9 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement
         final Key? key = _childElements[index]!.widget.key;
         final int? newIndex =
             key == null ? null : widget.delegate.findIndexByKey(key);
-        final SliverMultiBoxAdaptorParentData? childParentData =
+        final SliverCacheMultiBoxAdaptorParentData? childParentData =
             _childElements[index]!.renderObject?.parentData
-                as SliverMultiBoxAdaptorParentData?;
+                as SliverCacheMultiBoxAdaptorParentData?;
 
         if (childParentData != null && childParentData.layoutOffset != null)
           indexToLayoutOffset[index] = childParentData.layoutOffset!;

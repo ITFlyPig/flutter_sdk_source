@@ -5,30 +5,47 @@ import 'package:flutter_app/i_lru_cache.dart';
 
 class LruCache extends ILruCache {
   final int _maxNum;
-  late LinkedHashMap<int, RenderObject> _cache;
+  late LinkedHashMap<int?, RenderBox> _cache;
 
   LruCache(this._maxNum) {
     _cache = new LinkedHashMap();
   }
 
   @override
-  RenderObject? get(int key) {
+  RenderBox? get(int? key) {
     _cache.remove(key);
   }
 
   @override
-  put(int key, RenderObject obj) {
+  RenderBox? put(int? key, RenderBox obj) {
     //缓存
     _cache[key] = obj;
     //判断限制
-    while (_cache.length > _maxNum) {
+    if (_cache.length > _maxNum) {
       //删除最近最少使用的
-      _cache.remove(_cache.keys.last);
+      return remove(_cache.keys.last);
     }
+
+    return null;
   }
 
   @override
-  RenderObject? remove(int key) {
+  RenderBox? remove(int? key) {
     return _cache.remove(key);
+  }
+
+  @override
+  bool containsValue(RenderBox value) {
+    return _cache.containsKey(value);
+  }
+
+  @override
+  Iterable<RenderBox> getAllValue() {
+    return _cache.values;
+  }
+
+  @override
+  clearAll() {
+    _cache.clear();
   }
 }

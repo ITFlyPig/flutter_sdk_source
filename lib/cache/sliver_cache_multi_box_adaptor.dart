@@ -5,6 +5,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_app/i_lru_cache.dart';
+import 'package:flutter_app/lru_cache.dart';
 import 'package:vector_math/vector_math_64.dart';
 
 /// Parent data structure used by [RenderSliverCacheMultiBoxAdaptor].
@@ -85,6 +87,9 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
   /// The nodes being kept alive despite not being visible.
   final Map<int, RenderBox> _keepAliveBucket = <int, RenderBox>{};
 
+  ///添加LruCache
+  ILruCache _cache = LruCache(10);
+
   late List<RenderBox> _debugDanglingKeepAlives;
 
   /// Indicates whether integrity check is enabled.
@@ -137,6 +142,7 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
   @override
   void insert(RenderBox child, {RenderBox? after}) {
     assert(!_keepAliveBucket.containsValue(child));
+    assert(!_cache.containsValue(child));
     super.insert(child, after: after);
     assert(firstChild != null);
     assert(_debugVerifyChildOrder());
@@ -155,6 +161,17 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
     // [_keepAliveBucket]. We need to update the location of the child in the bucket.
     final SliverCacheMultiBoxAdaptorParentData childParentData =
         child.parentData! as SliverCacheMultiBoxAdaptorParentData;
+
+    //先判断是否在lrucache中
+    if (_cache.get(childParentData.index) == child) {
+      _cache.remove(childParentData.index);
+      //更新slot
+      childManager.didAdoptChild(child);
+      //重新插入cache
+      _cache.put(childParentData.index, child);
+      return;
+    }
+
     if (!childParentData.keptAlive) {
       super.move(child, after: after);
       childManager.didAdoptChild(child); // updates the slot in the parentData
@@ -199,6 +216,7 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
       _debugDanglingKeepAlives.remove(child);
       return true;
     }());
+    _cache.remove(childParentData.index);
     _keepAliveBucket.remove(childParentData.index);
     dropChild(child);
   }
@@ -208,13 +226,16 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
     super.removeAll();
     _keepAliveBucket.values.forEach(dropChild);
     _keepAliveBucket.clear();
+
+    _cache.getAllValue().forEach(dropChild);
+    _cache.clearAll();
   }
 
   void _createOrObtainChild(int index, {required RenderBox? after}) {
     invokeLayoutCallback<SliverConstraints>((SliverConstraints constraints) {
       assert(constraints == this.constraints);
-      print('_keepAliveBucket的数量：${_keepAliveBucket.length}');
       if (_keepAliveBucket.containsKey(index)) {
+        //判断AliveBucket
         final RenderBox child = _keepAliveBucket.remove(index)!;
         final SliverCacheMultiBoxAdaptorParentData childParentData =
             child.parentData! as SliverCacheMultiBoxAdaptorParentData;
@@ -223,8 +244,19 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
         child.parentData = childParentData;
         insert(child, after: after);
         childParentData._keptAlive = false;
+        print('使用_keepAliveBucket里面的数据');
+      } else if (_cache.get(index) != null) {
+        //判断LruCache
+        final RenderBox child = _cache.get(index)!;
+        final SliverCacheMultiBoxAdaptorParentData childParentData =
+            child.parentData! as SliverCacheMultiBoxAdaptorParentData;
+        dropChild(child);
+        child.parentData = childParentData;
+        insert(child, after: after);
+        print('使用缓存的child， index：${childParentData.index}');
       } else {
         _childManager.createChild(index, after: after);
+        print('创建child index：${index + 1}');
       }
     });
   }
@@ -232,6 +264,7 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
   void _destroyOrCacheChild(RenderBox child) {
     final SliverCacheMultiBoxAdaptorParentData childParentData =
         child.parentData! as SliverCacheMultiBoxAdaptorParentData;
+    print('_destroyOrCacheChild child index=${childParentData.index}');
     if (childParentData.keepAlive) {
       assert(!childParentData._keptAlive);
       remove(child);
@@ -240,9 +273,16 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
       super.adoptChild(child);
       childParentData._keptAlive = true;
     } else {
-      assert(child.parent == this);
-      _childManager.removeChild(child);
-      assert(child.parent == null);
+      //将child放入cache，同时检查是否有child被删除
+      RenderBox? removedChild = _cache.put(childParentData.index, child);
+      print(
+          '存入cache的child index：${childParentData.index} child:${child} 当前cache存储数量：${_cache.getAllValue().length}  是否有child被从cache移除：${removedChild != null}');
+      if (removedChild != null) {
+        //需要删除的child不为空，则删除
+        assert(removedChild.parent == this);
+        _childManager.removeChild(removedChild);
+        assert(removedChild.parent == null);
+      }
     }
   }
 
@@ -250,24 +290,28 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
   void attach(PipelineOwner owner) {
     super.attach(owner);
     for (final RenderBox child in _keepAliveBucket.values) child.attach(owner);
+    for (final RenderBox child in _cache.getAllValue()) child.attach(owner);
   }
 
   @override
   void detach() {
     super.detach();
     for (final RenderBox child in _keepAliveBucket.values) child.detach();
+    for (final RenderBox child in _cache.getAllValue()) child.detach();
   }
 
   @override
   void redepthChildren() {
     super.redepthChildren();
     _keepAliveBucket.values.forEach(redepthChild);
+    _cache.getAllValue().forEach(redepthChild);
   }
 
   @override
   void visitChildren(RenderObjectVisitor visitor) {
     super.visitChildren(visitor);
     _keepAliveBucket.values.forEach(visitor);
+    _cache.getAllValue().forEach(visitor);
   }
 
   @override
@@ -464,7 +508,8 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
 
   @override
   void applyPaintTransform(RenderBox child, Matrix4 transform) {
-    if (_keepAliveBucket.containsKey(indexOf(child))) {
+    if (_keepAliveBucket.containsKey(indexOf(child)) ||
+        _cache.get(indexOf(child)) != null) {
       // It is possible that widgets under kept alive children want to paint
       // themselves. For example, the Material widget tries to paint all
       // InkFeatures under its subtree as long as they are not disposed. In
