@@ -60,7 +60,9 @@
 /// 体的几何体发生变化时，它就会被标记为脏。
 ///
 
-abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin implements HitTestTarget {
+abstract class RenderObject extends AbstractNode
+    with DiagnosticableTreeMixin
+    implements HitTestTarget {
   /// Initializes internal fields for subclasses.
   RenderObject() {
     _needsCompositing = isRepaintBoundary || alwaysNeedsCompositing;
@@ -109,26 +111,37 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   /// You can call this function to set up the parent data for child before the
   /// child is added to the parent's child list.
   void setupParentData(covariant RenderObject child) {
-    if (child.parentData is! ParentData)
-      child.parentData = ParentData();
+    if (child.parentData is! ParentData) child.parentData = ParentData();
   }
 
-  /// 当子类（subclasses）决定收纳这个render object时，就会调用这个方法
+  /// 获取一个child
+  ///
+  /// 当子类（subclasses）决定收纳这个render object作为child时，就会调用这个方法
   ///
   /// 仅供子类（subclasses）在改变他们的child列表时使用。在其他情况下调用该函数会导致树不一致，并可能导致崩溃。
   @override
   void adoptChild(RenderObject child) {
+    //设置ParentData
     setupParentData(child);
+    //标记需要重新布局
     markNeedsLayout();
+    // 标记自己or parent 需要更新合成位
     markNeedsCompositingBitsUpdate();
     markNeedsSemanticsUpdate();
+
+    // 父类的功能：
+    // 1、更新child的parent为当前对象
+    // 2、将child附着到_owner
+    // 3、调整深度[depth]
     super.adoptChild(child);
   }
 
-  /// Called by subclasses when they decide a render object is no longer a child.
+  /// 丢弃一个child
   ///
-  /// Only for use by subclasses when changing their child lists. Calling this
-  /// in other cases will lead to an inconsistent tree and probably cause crashes.
+  /// 当子类决定一个渲染对象（render object）不再是child的时候调用
+  ///
+  /// 只有子类要改变它的child列表的，才调用这个方法。其他情况调用可能导致错误和崩溃。
+  ///
   @override
   void dropChild(RenderObject child) {
     child._cleanRelayoutBoundary();
@@ -143,7 +156,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   /// Calls visitor for each immediate child of this render object.
   ///
   /// Override in subclasses with children and call the visitor for each child.
-  void visitChildren(RenderObjectVisitor visitor) { }
+  void visitChildren(RenderObjectVisitor visitor) {}
 
   @override
   PipelineOwner? get owner => super.owner as PipelineOwner?;
@@ -177,7 +190,6 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     }
   }
 
-
   bool _needsLayout = true;
 
   RenderObject? _relayoutBoundary;
@@ -193,9 +205,11 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   @protected
   Constraints get constraints {
     if (_constraints == null)
-      throw StateError('A RenderObject does not have any constraints before it has been laid out.');
+      throw StateError(
+          'A RenderObject does not have any constraints before it has been laid out.');
     return _constraints!;
   }
+
   Constraints? _constraints;
 
   /// Mark this render object's layout information as dirty, and either register
@@ -336,8 +350,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       _debugDoingThisLayout = true;
       debugPreviousActiveLayout = _debugActiveLayout;
       _debugActiveLayout = this;
-      if (debugPrintLayouts)
-        debugPrint('Laying out (without resize) $this');
+      if (debugPrintLayouts) debugPrint('Laying out (without resize) $this');
       return true;
     }());
     try {
@@ -371,23 +384,29 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   ///
   /// 父类的[performLayout]方法应该无条件地调用其所有子类的[layout]。如果子代不需要做任何
   /// 工作来更新它的布局信息，那么[layout]方法有责任（就像这里实现的）提前返回。
-  void layout(Constraints constraints, { bool parentUsesSize = false }) {
-
+  void layout(Constraints constraints, {bool parentUsesSize = false}) {
     RenderObject? relayoutBoundary;
 
-    if (!parentUsesSize        //parent不使用child的size
-        || sizedByParent       //size是否是唯一根据约束来计算的，这种情况下，约束不变，那么size就不需要在计算
-        || constraints.isTight //严格的约束
-        || parent is! RenderObject) {//parent不是RenderObject
+    if (!parentUsesSize //parent不使用child的size
+        ||
+        sizedByParent //size是否是唯一根据约束来计算的，这种情况下，约束不变，那么size就不需要在计算
+        ||
+        constraints.isTight //严格的约束
+        ||
+        parent is! RenderObject) {
+      //parent不是RenderObject
       //满足上面这些条件之一，那么当前对象就是布局边界
       relayoutBoundary = this;
     } else {
       //循着parent向上找到布局边界
       relayoutBoundary = (parent! as RenderObject)._relayoutBoundary;
     }
-    if (!_needsLayout                               //不需要布局
-        && constraints == _constraints              //约束约束不变
-        && relayoutBoundary == _relayoutBoundary) { //布局边界不变
+    if (!_needsLayout //不需要布局
+        &&
+        constraints == _constraints //约束约束不变
+        &&
+        relayoutBoundary == _relayoutBoundary) {
+      //布局边界不变
       //都满足上面的条件，那么就直接退出，不需要布局
       return;
     }
@@ -411,8 +430,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       try {
         //在该方法里，使用约束条件进行尺寸的计算
         performResize();
-      } catch (e, stack) {
-      }
+      } catch (e, stack) {}
     }
 
     try {
@@ -420,8 +438,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       performLayout();
       //更新语义
       markNeedsSemanticsUpdate();
-    } catch (e, stack) {
-    }
+    } catch (e, stack) {}
     _needsLayout = false;
     //标记需要绘制
     markNeedsPaint();
@@ -434,7 +451,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   /// subclass should override [debugResetSize] to reapply the current values of
   /// [debugCanParentUseSize] to that state.
   @protected
-  void debugResetSize() { }
+  void debugResetSize() {}
 
   /// Whether the constraints are the only input to the sizing algorithm (in
   /// particular, child nodes have no impact).
@@ -496,7 +513,9 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   void invokeLayoutCallback<T extends Constraints>(LayoutCallback<T> callback) {
     _doingThisLayoutWithCallback = true;
     try {
-      owner!._enableMutationsToDirtySubtrees(() { callback(constraints as T); });
+      owner!._enableMutationsToDirtySubtrees(() {
+        callback(constraints as T);
+      });
     } finally {
       _doingThisLayoutWithCallback = false;
     }
@@ -507,7 +526,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     int? oldAngle, // 0..3
     int? newAngle, // 0..3
     Duration? time,
-  }) { }
+  }) {}
 
   // when the parent has rotated (e.g. when the screen has been turned
   // 90 degrees), immediately prior to layout() being called for the
@@ -519,9 +538,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   // pixel, on the output device. Then, the layout() method or
   // equivalent will be called.
 
-
   // PAINTING
-
 
   /// Whether this render object always needs compositing.
   ///
@@ -560,50 +577,43 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   @protected
   set layer(ContainerLayer? newLayer) {
     assert(
-    !isRepaintBoundary,
-    'Attempted to set a layer to a repaint boundary render object.\n'
-        'The framework creates and assigns an OffsetLayer to a repaint '
-        'boundary automatically.',
+      !isRepaintBoundary,
+      'Attempted to set a layer to a repaint boundary render object.\n'
+      'The framework creates and assigns an OffsetLayer to a repaint '
+      'boundary automatically.',
     );
     _layer = newLayer;
   }
+
   ContainerLayer? _layer;
 
-
-
   bool _needsCompositingBitsUpdate = false; // set to true when a child is added
-  /// Mark the compositing state for this render object as dirty.
+
+  /// 将此渲染对象的合成状态标记为dirty。
   ///
-  /// This is called to indicate that the value for [needsCompositing] needs to
-  /// be recomputed during the next [PipelineOwner.flushCompositingBits] engine
-  /// phase.
+  /// 调用该功能是为了表明在下一个[PipelineOwner.flushCompositingBits]引擎阶段需要重新
+  /// 计算[needsCompositing]的值。
   ///
-  /// When the subtree is mutated, we need to recompute our
-  /// [needsCompositing] bit, and some of our ancestors need to do the
-  /// same (in case ours changed in a way that will change theirs). To
-  /// this end, [adoptChild] and [dropChild] call this method, and, as
-  /// necessary, this method calls the parent's, etc, walking up the
-  /// tree to mark all the nodes that need updating.
+  /// 当子树发生突变时，我们需要重新计算我们的[needsCompositing]位，我们的一些祖先也需要做
+  /// 同样的事情（以防我们的改变会改变他们）。为此，[adopChild]和[dropChild]会调用这个方法
+  /// ，必要时，这个方法会调用父代等，在树上行走，标记所有需要更新的节点。
   ///
-  /// This method does not schedule a rendering frame, because since
-  /// it cannot be the case that _only_ the compositing bits changed,
-  /// something else will have scheduled a frame for us.
+  /// 这个方法不安排渲染帧，因为不可能只改变了合成位，其他东西会安排一帧。
+  ///
   void markNeedsCompositingBitsUpdate() {
-    if (_needsCompositingBitsUpdate)
-      return;
+    if (_needsCompositingBitsUpdate) return;
     _needsCompositingBitsUpdate = true;
     if (parent is RenderObject) {
       final RenderObject parent = this.parent! as RenderObject;
-      if (parent._needsCompositingBitsUpdate)
-        return;
+      if (parent._needsCompositingBitsUpdate) return;
       if (!isRepaintBoundary && !parent.isRepaintBoundary) {
         parent.markNeedsCompositingBitsUpdate();
         return;
       }
     }
     // parent is fine (or there isn't one), but we are dirty
-    if (owner != null)
-      owner!._nodesNeedingCompositingBitsUpdate.add(this);
+    // 将自己添加到需要更新合成位的集合中
+    if (owner != null) owner!._nodesNeedingCompositingBitsUpdate.add(this);
   }
 
   late bool _needsCompositing; // initialized in the constructor
@@ -615,24 +625,21 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   /// Only legal to call after [PipelineOwner.flushLayout] and
   /// [PipelineOwner.flushCompositingBits] have been called.
   bool get needsCompositing {
-    assert(!_needsCompositingBitsUpdate); // make sure we don't use this bit when it is dirty
+    assert(
+        !_needsCompositingBitsUpdate); // make sure we don't use this bit when it is dirty
     return _needsCompositing;
   }
 
   void _updateCompositingBits() {
-    if (!_needsCompositingBitsUpdate)
-      return;
+    if (!_needsCompositingBitsUpdate) return;
     final bool oldNeedsCompositing = _needsCompositing;
     _needsCompositing = false;
     visitChildren((RenderObject child) {
       child._updateCompositingBits();
-      if (child.needsCompositing)
-        _needsCompositing = true;
+      if (child.needsCompositing) _needsCompositing = true;
     });
-    if (isRepaintBoundary || alwaysNeedsCompositing)
-      _needsCompositing = true;
-    if (oldNeedsCompositing != _needsCompositing)
-      markNeedsPaint();
+    if (isRepaintBoundary || alwaysNeedsCompositing) _needsCompositing = true;
+    if (oldNeedsCompositing != _needsCompositing) markNeedsPaint();
     _needsCompositingBitsUpdate = false;
   }
 
@@ -653,8 +660,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   ///  * [RepaintBoundary], 限制[markNeedsPaint] 标记为dirty的节点数。
   void markNeedsPaint() {
     //已标记过，直接退出
-    if (_needsPaint)
-      return;
+    if (_needsPaint) return;
     //标记为需要绘制
     _needsPaint = true;
 
@@ -672,8 +678,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       // 如果我们是渲染树的根(可能是RenderView)，那么我们就必须绘制自己，因为没有人可以绘
       // 制我们。在这种情况下，我们不会把自己添加到_nodesNeedingPaint中，因为无论如何都会
       // 告诉根部要绘制。
-      if (owner != null)
-        owner!.requestVisualUpdate();
+      if (owner != null) owner!.requestVisualUpdate();
     }
   }
 
@@ -742,8 +747,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     // 也就是说，我们的图层可能还没有被分离），因为在布局阶段跳过我们的同一个节点在树的上方（很明显），因
     // 此可能还没有机会绘制（因为树的绘制顺序是相反的）。特别是如果他们有不同的图层，这种情况会发生，因为
     // 我们之间有一个重新绘制的边界。
-    if (_needsLayout)
-      return;
+    if (_needsLayout) return;
     _needsPaint = false;
     try {
       paint(context, offset);
@@ -771,7 +775,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   ///
   /// 当绘制你的一个child时，上下文（context）持有的当前画布可能会改变，因为在绘制子代（child）
   /// 之前和之后的绘制操作可能需要记录在不同的合成层上。
-  void paint(PaintingContext context, Offset offset) { }
+  void paint(PaintingContext context, Offset offset) {}
 
   /// Applies the transform that would be applied when painting the given child
   /// to the given matrix.
@@ -799,23 +803,22 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     assert(attached);
     if (ancestor == null) {
       final AbstractNode? rootNode = owner!.rootNode;
-      if (rootNode is RenderObject)
-        ancestor = rootNode;
+      if (rootNode is RenderObject) ancestor = rootNode;
     }
     final List<RenderObject> renderers = <RenderObject>[];
-    for (RenderObject renderer = this; renderer != ancestor; renderer = renderer.parent! as RenderObject) {
+    for (RenderObject renderer = this;
+        renderer != ancestor;
+        renderer = renderer.parent! as RenderObject) {
       assert(renderer != null); // Failed to find ancestor in parent chain.
       renderers.add(renderer);
     }
-    if (ancestorSpecified)
-      renderers.add(ancestor!);
+    if (ancestorSpecified) renderers.add(ancestor!);
     final Matrix4 transform = Matrix4.identity();
     for (int index = renderers.length - 1; index > 0; index -= 1) {
       renderers[index].applyPaintTransform(renderers[index - 1], transform);
     }
     return transform;
   }
-
 
   /// Returns a rect in this object's coordinate system that describes
   /// the approximate bounding box of the clip rect that would be
@@ -922,8 +925,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   ///
   /// See [SemanticsNode.sendEvent] for a full description of the behavior.
   void sendSemanticsEvent(SemanticsEvent semanticsEvent) {
-    if (owner!.semanticsOwner == null)
-      return;
+    if (owner!.semanticsOwner == null) return;
     if (_semantics != null && !_semantics!.isMergedIntoParent) {
       _semantics!.sendEvent(semanticsEvent);
     } else if (parent != null) {
@@ -996,18 +998,20 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     // RenderObject are still up-to date. Therefore, we will later only rebuild
     // the semantics subtree starting at the identified semantics boundary.
 
-    final bool wasSemanticsBoundary = _semantics != null && _cachedSemanticsConfiguration?.isSemanticBoundary == true;
+    final bool wasSemanticsBoundary = _semantics != null &&
+        _cachedSemanticsConfiguration?.isSemanticBoundary == true;
     _cachedSemanticsConfiguration = null;
-    bool isEffectiveSemanticsBoundary = _semanticsConfiguration.isSemanticBoundary && wasSemanticsBoundary;
+    bool isEffectiveSemanticsBoundary =
+        _semanticsConfiguration.isSemanticBoundary && wasSemanticsBoundary;
     RenderObject node = this;
 
     while (!isEffectiveSemanticsBoundary && node.parent is RenderObject) {
-      if (node != this && node._needsSemanticsUpdate)
-        break;
+      if (node != this && node._needsSemanticsUpdate) break;
       node._needsSemanticsUpdate = true;
 
       node = node.parent! as RenderObject;
-      isEffectiveSemanticsBoundary = node._semanticsConfiguration.isSemanticBoundary;
+      isEffectiveSemanticsBoundary =
+          node._semanticsConfiguration.isSemanticBoundary;
       if (isEffectiveSemanticsBoundary && node._semantics == null) {
         // We have reached a semantics boundary that doesn't own a semantics node.
         // That means the semantics of this branch are currently blocked and will
@@ -1028,7 +1032,8 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     if (!node._needsSemanticsUpdate) {
       node._needsSemanticsUpdate = true;
       if (owner != null) {
-        assert(node._semanticsConfiguration.isSemanticBoundary || node.parent is! RenderObject);
+        assert(node._semanticsConfiguration.isSemanticBoundary ||
+            node.parent is! RenderObject);
         owner!._nodesNeedingSemantics.add(node);
         owner!.requestVisualUpdate();
       }
@@ -1037,7 +1042,8 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
 
   /// Updates the semantic information of the render object.
   void _updateSemantics() {
-    assert(_semanticsConfiguration.isSemanticBoundary || parent is! RenderObject);
+    assert(
+        _semanticsConfiguration.isSemanticBoundary || parent is! RenderObject);
     if (_needsLayout) {
       // There's not enough information in this subtree to compute semantics.
       // The subtree is probably being kept alive by a viewport but not laid out.
@@ -1047,7 +1053,8 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       mergeIntoParent: _semantics?.parent?.isPartOfNodeMerging ?? false,
     );
     assert(fragment is _InterestingSemanticsFragment);
-    final _InterestingSemanticsFragment interestingFragment = fragment as _InterestingSemanticsFragment;
+    final _InterestingSemanticsFragment interestingFragment =
+        fragment as _InterestingSemanticsFragment;
     final List<SemanticsNode> result = <SemanticsNode>[];
     interestingFragment.compileChildren(
       parentSemanticsClipRect: _semantics?.parentSemanticsClipRect,
@@ -1065,15 +1072,21 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     required bool mergeIntoParent,
   }) {
     assert(mergeIntoParent != null);
-    assert(!_needsLayout, 'Updated layout information required for $this to calculate semantics.');
+    assert(!_needsLayout,
+        'Updated layout information required for $this to calculate semantics.');
 
     final SemanticsConfiguration config = _semanticsConfiguration;
-    bool dropSemanticsOfPreviousSiblings = config.isBlockingSemanticsOfPreviouslyPaintedNodes;
+    bool dropSemanticsOfPreviousSiblings =
+        config.isBlockingSemanticsOfPreviouslyPaintedNodes;
 
-    final bool producesForkingFragment = !config.hasBeenAnnotated && !config.isSemanticBoundary;
-    final List<_InterestingSemanticsFragment> fragments = <_InterestingSemanticsFragment>[];
-    final Set<_InterestingSemanticsFragment> toBeMarkedExplicit = <_InterestingSemanticsFragment>{};
-    final bool childrenMergeIntoParent = mergeIntoParent || config.isMergingSemanticsOfDescendants;
+    final bool producesForkingFragment =
+        !config.hasBeenAnnotated && !config.isSemanticBoundary;
+    final List<_InterestingSemanticsFragment> fragments =
+        <_InterestingSemanticsFragment>[];
+    final Set<_InterestingSemanticsFragment> toBeMarkedExplicit =
+        <_InterestingSemanticsFragment>{};
+    final bool childrenMergeIntoParent =
+        mergeIntoParent || config.isMergingSemanticsOfDescendants;
 
     // When set to true there's currently not enough information in this subtree
     // to compute semantics. In this case the walk needs to be aborted and no
@@ -1087,7 +1100,8 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
         abortWalk = true;
         return;
       }
-      final _SemanticsFragment parentFragment = renderChild._getSemanticsForParent(
+      final _SemanticsFragment parentFragment =
+          renderChild._getSemanticsForParent(
         mergeIntoParent: childrenMergeIntoParent,
       );
       if (parentFragment.abortsWalk) {
@@ -1097,11 +1111,11 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       if (parentFragment.dropsSemanticsOfPreviousSiblings) {
         fragments.clear();
         toBeMarkedExplicit.clear();
-        if (!config.isSemanticBoundary)
-          dropSemanticsOfPreviousSiblings = true;
+        if (!config.isSemanticBoundary) dropSemanticsOfPreviousSiblings = true;
       }
       // Figure out which child fragments are to be made explicit.
-      for (final _InterestingSemanticsFragment fragment in parentFragment.interestingFragments) {
+      for (final _InterestingSemanticsFragment fragment
+          in parentFragment.interestingFragments) {
         fragments.add(fragment);
         fragment.addAncestor(this);
         fragment.addTags(config.tagsForChildren);
@@ -1109,8 +1123,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
           fragment.markAsExplicit();
           continue;
         }
-        if (!fragment.hasConfigForParent || producesForkingFragment)
-          continue;
+        if (!fragment.hasConfigForParent || producesForkingFragment) continue;
         if (!config.isCompatibleWith(fragment.config))
           toBeMarkedExplicit.add(fragment);
         final int siblingLength = fragments.length - 1;
@@ -1153,7 +1166,8 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
         dropsSemanticsOfPreviousSiblings: dropSemanticsOfPreviousSiblings,
       );
       if (config.isSemanticBoundary) {
-        final _SwitchableSemanticsFragment fragment = result as _SwitchableSemanticsFragment;
+        final _SwitchableSemanticsFragment fragment =
+            result as _SwitchableSemanticsFragment;
         fragment.markAsExplicit();
       }
     }
@@ -1190,21 +1204,22 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   /// to the tree. If new [SemanticsNode]s are instantiated in this method
   /// they must be disposed in [clearSemantics].
   void assembleSemanticsNode(
-      SemanticsNode node,
-      SemanticsConfiguration config,
-      Iterable<SemanticsNode> children,
-      ) {
+    SemanticsNode node,
+    SemanticsConfiguration config,
+    Iterable<SemanticsNode> children,
+  ) {
     assert(node == _semantics);
     // TODO(a14n): remove the following cast by updating type of parameter in either updateWith or assembleSemanticsNode
-    node.updateWith(config: config, childrenInInversePaintOrder: children as List<SemanticsNode>);
+    node.updateWith(
+        config: config,
+        childrenInInversePaintOrder: children as List<SemanticsNode>);
   }
 
   // EVENTS
 
   /// Override this method to handle pointer events that hit this render object.
   @override
-  void handleEvent(PointerEvent event, covariant HitTestEntry entry) { }
-
+  void handleEvent(PointerEvent event, covariant HitTestEntry entry) {}
 
   // HIT TESTING
 
@@ -1225,7 +1240,6 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   // If you add yourself to /result/ and still return false, then that means you
   // will see events but so will objects below you.
 
-
   /// Returns a human understandable name.
   @override
   String toStringShort() {
@@ -1239,19 +1253,16 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       }
       header += ' relayoutBoundary=up$count';
     }
-    if (_needsLayout)
-      header += ' NEEDS-LAYOUT';
-    if (_needsPaint)
-      header += ' NEEDS-PAINT';
-    if (_needsCompositingBitsUpdate)
-      header += ' NEEDS-COMPOSITING-BITS-UPDATE';
-    if (!attached)
-      header += ' DETACHED';
+    if (_needsLayout) header += ' NEEDS-LAYOUT';
+    if (_needsPaint) header += ' NEEDS-PAINT';
+    if (_needsCompositingBitsUpdate) header += ' NEEDS-COMPOSITING-BITS-UPDATE';
+    if (!attached) header += ' DETACHED';
     return header;
   }
 
   @override
-  String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) => toStringShort();
+  String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) =>
+      toStringShort();
 
   /// Returns a description of the tree rooted at this node.
   /// If the prefix argument is provided, then every line in the output
@@ -1296,7 +1307,8 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       _debugActiveLayout = null;
       return true;
     }());
-    final String result = super.toStringShallow(joiner: joiner, minLevel: minLevel);
+    final String result =
+        super.toStringShallow(joiner: joiner, minLevel: minLevel);
     assert(() {
       _debugActiveLayout = debugPreviousActiveLayout;
       return true;
@@ -1308,19 +1320,31 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties.add(FlagProperty('needsCompositing', value: _needsCompositing, ifTrue: 'needs compositing'));
-    properties.add(DiagnosticsProperty<Object?>('creator', debugCreator, defaultValue: null, level: DiagnosticLevel.debug));
-    properties.add(DiagnosticsProperty<ParentData>('parentData', parentData, tooltip: _debugCanParentUseSize == true ? 'can use size' : null, missingIfNull: true));
-    properties.add(DiagnosticsProperty<Constraints>('constraints', _constraints, missingIfNull: true));
+    properties.add(FlagProperty('needsCompositing',
+        value: _needsCompositing, ifTrue: 'needs compositing'));
+    properties.add(DiagnosticsProperty<Object?>('creator', debugCreator,
+        defaultValue: null, level: DiagnosticLevel.debug));
+    properties.add(DiagnosticsProperty<ParentData>('parentData', parentData,
+        tooltip: _debugCanParentUseSize == true ? 'can use size' : null,
+        missingIfNull: true));
+    properties.add(DiagnosticsProperty<Constraints>('constraints', _constraints,
+        missingIfNull: true));
     // don't access it via the "layer" getter since that's only valid when we don't need paint
-    properties.add(DiagnosticsProperty<ContainerLayer>('layer', _layer, defaultValue: null));
-    properties.add(DiagnosticsProperty<SemanticsNode>('semantics node', _semantics, defaultValue: null));
+    properties.add(DiagnosticsProperty<ContainerLayer>('layer', _layer,
+        defaultValue: null));
+    properties.add(DiagnosticsProperty<SemanticsNode>(
+        'semantics node', _semantics,
+        defaultValue: null));
     properties.add(FlagProperty(
       'isBlockingSemanticsOfPreviouslyPaintedNodes',
-      value: _semanticsConfiguration.isBlockingSemanticsOfPreviouslyPaintedNodes,
-      ifTrue: 'blocks semantics of earlier render objects below the common boundary',
+      value:
+          _semanticsConfiguration.isBlockingSemanticsOfPreviouslyPaintedNodes,
+      ifTrue:
+          'blocks semantics of earlier render objects below the common boundary',
     ));
-    properties.add(FlagProperty('isSemanticBoundary', value: _semanticsConfiguration.isSemanticBoundary, ifTrue: 'semantic boundary'));
+    properties.add(FlagProperty('isSemanticBoundary',
+        value: _semanticsConfiguration.isSemanticBoundary,
+        ifTrue: 'semantic boundary'));
   }
 
   @override
@@ -1372,7 +1396,8 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   ///
   /// You should always include a RenderObject in an error message if it is the
   /// [RenderObject] causing the failure or contract violation of the error.
-  DiagnosticsNode describeForError(String name, { DiagnosticsTreeStyle style = DiagnosticsTreeStyle.shallow }) {
+  DiagnosticsNode describeForError(String name,
+      {DiagnosticsTreeStyle style = DiagnosticsTreeStyle.shallow}) {
     return toDiagnosticsNode(name: name, style: style);
   }
 }

@@ -5,6 +5,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_app/i_lru_cache.dart';
+import 'package:flutter_app/lru_cache.dart';
 import 'package:vector_math/vector_math_64.dart';
 
 /// Parent data structure used by [RenderSliverCacheMultiBoxAdaptor].
@@ -84,6 +86,8 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
 
   /// The nodes being kept alive despite not being visible.
   final Map<int, RenderBox> _keepAliveBucket = <int, RenderBox>{};
+
+  ILruCache _cache = new LruCache(10);
 
   late List<RenderBox> _debugDanglingKeepAlives;
 
@@ -190,17 +194,23 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
   void remove(RenderBox child) {
     final SliverCacheMultiBoxAdaptorParentData childParentData =
         child.parentData! as SliverCacheMultiBoxAdaptorParentData;
-    if (!childParentData._keptAlive) {
+    print('remove child index=${childParentData.index}');
+    if (childParentData._keptAlive) {
+      assert(_keepAliveBucket[childParentData.index] == child);
+      assert(() {
+        _debugDanglingKeepAlives.remove(child);
+        return true;
+      }());
+      //从AliveBucket中删除
+      _keepAliveBucket.remove(childParentData.index);
+      //不是child
+      dropChild(child);
+    } else if (_cache.get(childParentData.index) != null) {
+      _cache.remove(childParentData.index);
+      dropChild(child);
+    } else {
       super.remove(child);
-      return;
     }
-    assert(_keepAliveBucket[childParentData.index] == child);
-    assert(() {
-      _debugDanglingKeepAlives.remove(child);
-      return true;
-    }());
-    _keepAliveBucket.remove(childParentData.index);
-    dropChild(child);
   }
 
   @override
@@ -212,8 +222,8 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
 
   void _createOrObtainChild(int index, {required RenderBox? after}) {
     invokeLayoutCallback<SliverConstraints>((SliverConstraints constraints) {
+      print('_createOrObtainChild index=${index}');
       assert(constraints == this.constraints);
-      print('_keepAliveBucket的数量：${_keepAliveBucket.length}');
       if (_keepAliveBucket.containsKey(index)) {
         final RenderBox child = _keepAliveBucket.remove(index)!;
         final SliverCacheMultiBoxAdaptorParentData childParentData =
@@ -223,8 +233,20 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
         child.parentData = childParentData;
         insert(child, after: after);
         childParentData._keptAlive = false;
+        print('使用已_keptAlive的child');
       } else {
-        _childManager.createChild(index, after: after);
+        RenderBox? cachedChild = _cache.get(index);
+        if (cachedChild != null) {
+          final SliverCacheMultiBoxAdaptorParentData childParentData =
+              cachedChild.parentData! as SliverCacheMultiBoxAdaptorParentData;
+          dropChild(cachedChild);
+          cachedChild.parentData = childParentData;
+          insert(cachedChild, after: after);
+          print('使用已cache的child');
+        } else {
+          print('createChild创建child');
+          _childManager.createChild(index, after: after);
+        }
       }
     });
   }
@@ -232,6 +254,7 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
   void _destroyOrCacheChild(RenderBox child) {
     final SliverCacheMultiBoxAdaptorParentData childParentData =
         child.parentData! as SliverCacheMultiBoxAdaptorParentData;
+    print('_destroyOrCacheChild index=${childParentData.index}');
     if (childParentData.keepAlive) {
       assert(!childParentData._keptAlive);
       remove(child);
@@ -240,9 +263,21 @@ abstract class RenderSliverCacheMultiBoxAdaptor extends RenderSliver
       super.adoptChild(child);
       childParentData._keptAlive = true;
     } else {
-      assert(child.parent == this);
-      _childManager.removeChild(child);
-      assert(child.parent == null);
+      RenderBox? old = _cache.remove(childParentData.index);
+      if (old != null) {
+        //需要将之前的删除
+        _childManager.removeChild(old);
+        print('删除之前缓存的的child');
+      }
+
+      RenderBox? redundant = _cache.put(childParentData.index, child);
+      print('将child放入缓存，目前缓存数量：${_cache.length()}');
+      if (redundant != null) {
+        //缓存不了的，删除
+        assert(redundant.parent == this);
+        _childManager.removeChild(redundant);
+        assert(redundant.parent == null);
+      }
     }
   }
 

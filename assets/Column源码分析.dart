@@ -411,7 +411,7 @@ class _LayoutSizes {
 }
 
 
-///一个 对具有child列表的render object比较通用的mixin
+///对具有child列表的render object比较通用的mixin
 ///
 /// 为一个render object的子类提供了child模型，该子类用双向链表组织children。
 ///
@@ -419,9 +419,298 @@ class _LayoutSizes {
 ///[ParentDataType] 将父容器的数据存储在其子render objects上。ParentDataType必须是继承自[ContainerParentDataMixin]的，[ContainerParentDataMixin]提供了访问child的接口。
 ///该数据由使用该mixin的类，使用[RenderObject.setupParentData]方法填充。
 ///
-///当使用[RenderBox]作为子类型时，您通常会希望使用[RenderBoxContainerDefaultsMixin]并扩展[ContainerBoxParentData]作为父数据。
+///当使用[RenderBox]作为child的类型时，您通常会希望使用[RenderBoxContainerDefaultsMixin]并扩展[ContainerBoxParentData]作为父数据。
 mixin ContainerRenderObjectMixin<ChildType extends RenderObject, ParentDataType extends ContainerParentDataMixin<ChildType>> on RenderObject {
+  bool _debugUltimatePreviousSiblingOf(ChildType child, { ChildType? equals }) {
+    ParentDataType childParentData = child.parentData! as ParentDataType;
+    while (childParentData.previousSibling != null) {
+      assert(childParentData.previousSibling != child);
+      child = childParentData.previousSibling!;
+      childParentData = child.parentData! as ParentDataType;
+    }
+    return child == equals;
+  }
+  bool _debugUltimateNextSiblingOf(ChildType child, { ChildType? equals }) {
+    ParentDataType childParentData = child.parentData! as ParentDataType;
+    while (childParentData.nextSibling != null) {
+      assert(childParentData.nextSibling != child);
+      child = childParentData.nextSibling!;
+      childParentData = child.parentData! as ParentDataType;
+    }
+    return child == equals;
+  }
 
+  int _childCount = 0;
+  /// The number of children.
+  int get childCount => _childCount;
+
+  /// Checks whether the given render object has the correct [runtimeType] to be
+  /// a child of this render object.
+  ///
+  /// Does nothing if assertions are disabled.
+  ///
+  /// Always returns true.
+  bool debugValidateChild(RenderObject child) {
+    assert(() {
+      if (child is! ChildType) {
+        throw FlutterError.fromParts(<DiagnosticsNode>[
+          ErrorSummary(
+              'A $runtimeType expected a child of type $ChildType but received a '
+                  'child of type ${child.runtimeType}.'
+          ),
+          ErrorDescription(
+              'RenderObjects expect specific types of children because they '
+                  'coordinate with their children during layout and paint. For '
+                  'example, a RenderSliver cannot be the child of a RenderBox because '
+                  'a RenderSliver does not understand the RenderBox layout protocol.'
+          ),
+          ErrorSpacer(),
+          DiagnosticsProperty<Object?>(
+            'The $runtimeType that expected a $ChildType child was created by',
+            debugCreator,
+            style: DiagnosticsTreeStyle.errorProperty,
+          ),
+          ErrorSpacer(),
+          DiagnosticsProperty<Object?>(
+            'The ${child.runtimeType} that did not match the expected child type '
+                'was created by',
+            child.debugCreator,
+            style: DiagnosticsTreeStyle.errorProperty,
+          ),
+        ]);
+      }
+      return true;
+    }());
+    return true;
+  }
+
+  ChildType? _firstChild;
+  ChildType? _lastChild;
+
+  // 将新的child添加到child列表
+  // 这里的主要逻辑仅仅是记录了child的前后关系，更新了列表信息
+  void _insertIntoChildList(ChildType child, { ChildType? after }) {
+    final ParentDataType childParentData = child.parentData! as ParentDataType;
+    assert(childParentData.nextSibling == null);
+    assert(childParentData.previousSibling == null);
+    _childCount += 1;
+    assert(_childCount > 0);
+    if (after == null) {
+      // insert at the start (_firstChild)
+      childParentData.nextSibling = _firstChild;
+      if (_firstChild != null) {
+        final ParentDataType _firstChildParentData = _firstChild!.parentData! as ParentDataType;
+        _firstChildParentData.previousSibling = child;
+      }
+      _firstChild = child;
+      _lastChild ??= child;
+    } else {
+      assert(_firstChild != null);
+      assert(_lastChild != null);
+      assert(_debugUltimatePreviousSiblingOf(after, equals: _firstChild));
+      assert(_debugUltimateNextSiblingOf(after, equals: _lastChild));
+      final ParentDataType afterParentData = after.parentData! as ParentDataType;
+      if (afterParentData.nextSibling == null) {
+        // insert at the end (_lastChild); we'll end up with two or more children
+        assert(after == _lastChild);
+        childParentData.previousSibling = after;
+        afterParentData.nextSibling = child;
+        _lastChild = child;
+      } else {
+        // insert in the middle; we'll end up with three or more children
+        // set up links from child to siblings
+        childParentData.nextSibling = afterParentData.nextSibling;
+        childParentData.previousSibling = after;
+        // set up links from siblings to child
+        final ParentDataType childPreviousSiblingParentData = childParentData.previousSibling!.parentData! as ParentDataType;
+        final ParentDataType childNextSiblingParentData = childParentData.nextSibling!.parentData! as ParentDataType;
+        childPreviousSiblingParentData.nextSibling = child;
+        childNextSiblingParentData.previousSibling = child;
+        assert(afterParentData.nextSibling == child);
+      }
+    }
+  }
+  /// 在render object的child列表中，将新的child插入到给定的child后面
+  ///
+  /// 如果 `after`为null，则将child插入到列表头
+  void insert(ChildType child, { ChildType? after }) {
+    assert(child != this, 'A RenderObject cannot be inserted into itself.');
+    assert(after != this, 'A RenderObject cannot simultaneously be both the parent and the sibling of another RenderObject.');
+    assert(child != after, 'A RenderObject cannot be inserted after itself.');
+    assert(child != _firstChild);
+    assert(child != _lastChild);
+    adoptChild(child);
+    _insertIntoChildList(child, after: after);
+  }
+
+  /// 在列表末尾，添加一个child
+  /// Append child to the end of this render object's child list.
+  void add(ChildType child) {
+    insert(child, after: _lastChild);
+  }
+
+  /// Add all the children to the end of this render object's child list.
+  void addAll(List<ChildType>? children) {
+    children?.forEach(add);
+  }
+
+  ///
+  /// 从child列表中移传入的child
+  ///
+  void _removeFromChildList(ChildType child) {
+    final ParentDataType childParentData = child.parentData! as ParentDataType;
+    assert(_debugUltimatePreviousSiblingOf(child, equals: _firstChild));
+    assert(_debugUltimateNextSiblingOf(child, equals: _lastChild));
+    assert(_childCount >= 0);
+    if (childParentData.previousSibling == null) {
+      assert(_firstChild == child);
+      _firstChild = childParentData.nextSibling;
+    } else {
+      final ParentDataType childPreviousSiblingParentData = childParentData.previousSibling!.parentData! as ParentDataType;
+      childPreviousSiblingParentData.nextSibling = childParentData.nextSibling;
+    }
+    if (childParentData.nextSibling == null) {
+      assert(_lastChild == child);
+      _lastChild = childParentData.previousSibling;
+    } else {
+      final ParentDataType childNextSiblingParentData = childParentData.nextSibling!.parentData! as ParentDataType;
+      childNextSiblingParentData.previousSibling = childParentData.previousSibling;
+    }
+    childParentData.previousSibling = null;
+    childParentData.nextSibling = null;
+    _childCount -= 1;
+  }
+
+  /// 从child列表中移传入的child
+  ///
+  /// Requires the child to be present in the child list.
+  void remove(ChildType child) {
+    _removeFromChildList(child);
+    dropChild(child);
+  }
+
+  /// Remove all their children from this render object's child list.
+  ///
+  /// More efficient than removing them individually.
+  void removeAll() {
+    ChildType? child = _firstChild;
+    while (child != null) {
+      final ParentDataType childParentData = child.parentData! as ParentDataType;
+      final ChildType? next = childParentData.nextSibling;
+      childParentData.previousSibling = null;
+      childParentData.nextSibling = null;
+      dropChild(child);
+      child = next;
+    }
+    _firstChild = null;
+    _lastChild = null;
+    _childCount = 0;
+  }
+
+  /// 移动child，也就是先删除在插入
+  ///
+  /// 比删除和重新添加子代更有效率。要求子代已经在子代列表中的某个位置。将 "after "传给null，
+  /// 以将子代移到子代列表的起始位置。
+  ///
+  /// Move the given `child` in the child list to be after another child.
+  ///
+  /// More efficient than removing and re-adding the child. Requires the child
+  /// to already be in the child list at some position. Pass null for `after` to
+  /// move the child to the start of the child list.
+  void move(ChildType child, { ChildType? after }) {
+    final ParentDataType childParentData = child.parentData! as ParentDataType;
+    if (childParentData.previousSibling == after)
+      return;
+    _removeFromChildList(child);
+    _insertIntoChildList(child, after: after);
+    markNeedsLayout();
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    //附着自己
+    super.attach(owner);
+    //遍历child进行附着
+    ChildType? child = _firstChild;
+    while (child != null) {
+      child.attach(owner);
+      final ParentDataType childParentData = child.parentData! as ParentDataType;
+      child = childParentData.nextSibling;
+    }
+  }
+
+  @override
+  void detach() {
+    //分离自己
+    super.detach();
+    //遍历child进行分离
+    ChildType? child = _firstChild;
+    while (child != null) {
+      child.detach();
+      final ParentDataType childParentData = child.parentData! as ParentDataType;
+      child = childParentData.nextSibling;
+    }
+  }
+
+  @override
+  void redepthChildren() {
+    ChildType? child = _firstChild;
+    while (child != null) {
+      redepthChild(child);
+      final ParentDataType childParentData = child.parentData! as ParentDataType;
+      child = childParentData.nextSibling;
+    }
+  }
+
+  @override
+  void visitChildren(RenderObjectVisitor visitor) {
+    ChildType? child = _firstChild;
+    while (child != null) {
+      visitor(child);
+      final ParentDataType childParentData = child.parentData! as ParentDataType;
+      child = childParentData.nextSibling;
+    }
+  }
+
+  /// The first child in the child list.
+  ChildType? get firstChild => _firstChild;
+
+  /// The last child in the child list.
+  ChildType? get lastChild => _lastChild;
+
+  /// The previous child before the given child in the child list.
+  ChildType? childBefore(ChildType child) {
+    assert(child != null);
+    assert(child.parent == this);
+    final ParentDataType childParentData = child.parentData! as ParentDataType;
+    return childParentData.previousSibling;
+  }
+
+  /// The next child after the given child in the child list.
+  ChildType? childAfter(ChildType child) {
+    assert(child != null);
+    assert(child.parent == this);
+    final ParentDataType childParentData = child.parentData! as ParentDataType;
+    return childParentData.nextSibling;
+  }
+
+  @override
+  List<DiagnosticsNode> debugDescribeChildren() {
+    final List<DiagnosticsNode> children = <DiagnosticsNode>[];
+    if (firstChild != null) {
+      ChildType child = firstChild!;
+      int count = 1;
+      while (true) {
+        children.add(child.toDiagnosticsNode(name: 'child $count'));
+        if (child == lastChild)
+          break;
+        count += 1;
+        final ParentDataType childParentData = child.parentData! as ParentDataType;
+        child = childParentData.nextSibling!;
+      }
+    }
+    return children;
+  }
 }
 
 ///对ContainerRenderObjectMixin管理children，提供了有用的默认的行为。

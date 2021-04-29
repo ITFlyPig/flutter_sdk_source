@@ -55,7 +55,7 @@ class RenderCacheSliverList extends RenderSliverCacheMultiBoxAdaptor {
     // print('remainingExtent:${remainingExtent}');
     assert(remainingExtent >= 0.0);
     final double targetEndScrollOffset = scrollOffset + remainingExtent;
-    print('targetEndScrollOffset:${targetEndScrollOffset}');
+    // print('targetEndScrollOffset:${targetEndScrollOffset}');
     final BoxConstraints childConstraints = constraints.asBoxConstraints();
     int leadingGarbage = 0;
     int trailingGarbage = 0;
@@ -270,14 +270,14 @@ class RenderCacheSliverList extends RenderSliverCacheMultiBoxAdaptor {
       childParentData.layoutOffset = endScrollOffset;
       assert(childParentData.index == index);
       endScrollOffset = childScrollOffset(child!)! + paintExtentOf(child!);
-      print('child:${child}   布局偏移：${childScrollOffset(child!)}');
+      // print('child:${child}   布局偏移：${childScrollOffset(child!)}');
       return true;
     }
 
     // Find the first child that ends after the scroll offset.
     while (endScrollOffset < scrollOffset) {
       leadingGarbage += 1;
-      print('endScrollOffset < scrollOffset');
+      // print('endScrollOffset < scrollOffset');
       if (!advance()) {
         assert(leadingGarbage == childCount);
         assert(child == null);
@@ -297,7 +297,7 @@ class RenderCacheSliverList extends RenderSliverCacheMultiBoxAdaptor {
 
     // Now find the first child that ends after our end.
     while (endScrollOffset < targetEndScrollOffset) {
-      print('endScrollOffset < targetEndScrollOffset');
+      // print('endScrollOffset < targetEndScrollOffset');
       if (!advance()) {
         reachedEnd = true;
         break;

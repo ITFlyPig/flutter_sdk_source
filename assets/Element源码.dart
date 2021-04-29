@@ -27,8 +27,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// 使用一个给定的widget配置创建元素element
   ///
   /// 通常由[Widget.createElement]的重写方法调用
-  Element(Widget widget)
-      :_widget = widget;
+  Element(Widget widget) : _widget = widget;
 
   Element? _parent;
 
@@ -43,17 +42,14 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   int get depth {
     return _depth;
   }
+
   late int _depth;
 
   static int _sort(Element a, Element b) {
-    if (a.depth < b.depth)
-      return -1;
-    if (b.depth < a.depth)
-      return 1;
-    if (b.dirty && !a.dirty)
-      return -1;
-    if (a.dirty && !b.dirty)
-      return 1;
+    if (a.depth < b.depth) return -1;
+    if (b.depth < a.depth) return 1;
+    if (b.dirty && !a.dirty) return -1;
+    if (a.dirty && !b.dirty) return 1;
     return 0;
   }
 
@@ -80,6 +76,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
       else
         element.visitChildren(visit);
     }
+
     visit(this);
     return result;
   }
@@ -98,7 +95,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// being updated at that point, so the children might not be constructed yet,
   /// or might be old children that are going to be replaced. This method should
   /// only be called if it is provable that the children are available.
-  void visitChildren(ElementVisitor visitor) { }
+  void visitChildren(ElementVisitor visitor) {}
 
   /// Wrapper around [visitChildren] for [BuildContext].
   @override
@@ -106,6 +103,38 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
     visitChildren(visitor);
   }
 
+  ///用给定的新配置更新传入的child
+  ///
+  /// 这个方法是widgets系统的核心。每次我们要根据更新的配置添加、更新或删除一个child时，都会调用这个方法。
+  ///
+  /// `newSlot`参数指定了这个元素[slot]的新值。
+  ///
+  /// 如果 "child "是空的，而 "newWidget "不是空的，那么我们就会用 "newWidget "作为配
+  /// 置创建一个新的[Element]类型的 child。
+  ///
+  /// 如果 "newWidget "是空的，而 "child "不是空的，那么我们需要删除它，因为它已经没有配置了。
+  ///
+  /// 如果两者都不为空，那么我们需要更新`child`的配置为`newWidget`。如果`newWidget`可以传
+  /// 递给存在的child[由Widget.canUpdate]决定)，那么就给它。否则，旧的child需要被disposed，
+  /// 并为新的配置创建一个新的child。
+  ///
+  /// 如果两个都是空的，那我们没有child，也不会有child，所以我们什么都不做。
+  ///
+  /// [updateChild]方法如果要创建新的子代，则返回新的子代；如果只需要更新子代，则返回传入
+  /// 的子代；如果删除了子代，没有替换，则返回空值。
+  ///
+  /// 下表概述了上述情况：
+  ///
+  /// |                     | **newWidget == null**  | **newWidget != null**   |
+  /// | :-----------------: | :--------------------- | :---------------------- |
+  /// |  **child == null**  |  Returns null.         |  Returns new [Element]. |
+  /// |  **child != null**  |  Old child is removed, returns null. | Old child updated if possible, returns child or new [Element]. |
+  ///
+  /// `newSlot`参数仅在`newWidget`不是空的情况下使用。如果`child`为空（或者旧的child不能更新），
+  /// 那么`newSlot`将传递给通过[inflateWidget]创建的新的[Element]。如果`child`不是空的
+  /// （并且旧的子元素可以更新），那么`newSlot`就会被交给[updateSlotForChild]来更新它的槽，
+  /// 以防它在最后一次构建后被移动。
+  ///
   /// Update the given child with the given new configuration.
   ///
   /// This method is the core of the widgets system. It is called each time we
@@ -149,49 +178,44 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// See the [RenderObjectElement] documentation for more information on slots.
   @protected
   Element? updateChild(Element? child, Widget? newWidget, dynamic newSlot) {
+    //配置为空，对应element不为空，则将对应element移除
     if (newWidget == null) {
-      if (child != null)
-        deactivateChild(child);
+      if (child != null) deactivateChild(child);
       return null;
     }
+
     final Element newChild;
     if (child != null) {
       bool hasSameSuperclass = true;
-      // When the type of a widget is changed between Stateful and Stateless via
-      // hot reload, the element tree will end up in a partially invalid state.
-      // That is, if the widget was a StatefulWidget and is now a StatelessWidget,
-      // then the element tree currently contains a StatefulElement that is incorrectly
-      // referencing a StatelessWidget (and likewise with StatelessElement).
+
+      //当小组件的类型通过热重载在Stateful和Stateless之间更改时，element树最终将处于部分
+      // 无效状态。也就是说，如果widget是一个StatefulWidget，而现在是一个StatelessWidget，
+      // 那么元素树当前包含的StatefulElement错误地引用了一个StatelessWidget（同样也包含StatelessElement）。
+
+      // 为了避免因类型错误而导致崩溃，我们需要轻轻地将无效元素从树中引导出来。为此，我们确
+      // 保`hasSameSuperclass`条件返回false，这样可以防止我们试图错误地更新现有元素。
       //
-      // To avoid crashing due to type errors, we need to gently guide the invalid
-      // element out of the tree. To do so, we ensure that the `hasSameSuperclass` condition
-      // returns false which prevents us from trying to update the existing element
-      // incorrectly.
-      //
-      // For the case where the widget becomes Stateful, we also need to avoid
-      // accessing `StatelessElement.widget` as the cast on the getter will
-      // cause a type error to be thrown. Here we avoid that by short-circuiting
-      // the `Widget.canUpdate` check once `hasSameSuperclass` is false.
+      //对于widget变成Stateful的情况，我们还需要避免访问`StatelessElement.widget`，
+      // 因为在getter上的投射会导致类型错误被抛出。在这里，我们通过在`hasSameSuperclass`
+      // 为false时对`Widget.canUpdate`检查进行短路来避免这种情况。
       if (hasSameSuperclass && child.widget == newWidget) {
-        if (child.slot != newSlot)
-          updateSlotForChild(child, newSlot);
+        // 对于widget实例是同一个的情况--------------update
+        if (child.slot != newSlot) updateSlotForChild(child, newSlot);
         newChild = child;
-      } else if (hasSameSuperclass && Widget.canUpdate(child.widget, newWidget)) {
-        if (child.slot != newSlot)
-          updateSlotForChild(child, newSlot);
+      } else if (hasSameSuperclass &&
+          Widget.canUpdate(child.widget, newWidget)) {
+        // widget实例不是同一个，但是属于同一类型的情况--------------update
+        if (child.slot != newSlot) updateSlotForChild(child, newSlot);
         child.update(newWidget);
-        assert(child.widget == newWidget);
-        assert(() {
-          child.owner!._debugElementWasRebuilt(child);
-          return true;
-        }());
         newChild = child;
       } else {
+        // widget不是同一类型的情况：--------------remove
         deactivateChild(child);
-        assert(child._parent == null);
+        //--------------create
         newChild = inflateWidget(newWidget, newSlot);
       }
     } else {
+      //首次进来，创建widget对应的element：--------------create
       newChild = inflateWidget(newWidget, newSlot);
     }
     return newChild;
@@ -254,9 +278,9 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   void updateSlotForChild(Element child, dynamic newSlot) {
     void visit(Element element) {
       element._updateSlot(newSlot);
-      if (element is! RenderObjectElement)
-        element.visitChildren(visit);
+      if (element is! RenderObjectElement) element.visitChildren(visit);
     }
+
     visit(child);
   }
 
@@ -294,14 +318,12 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
     _slot = null;
   }
 
-  /// Add [renderObject] to the render tree at the location specified by `newSlot`.
+  /// 将[renderObject]添加到渲染树中 "newSlot "指定的位置。
   ///
-  /// The default implementation of this function simply calls
-  /// [attachRenderObject] recursively on each child. The
-  /// [RenderObjectElement.attachRenderObject] override does the actual work of
-  /// adding [renderObject] to the render tree.
+  /// 该函数的默认实现只是在每个子代上递归地调用[attachRenderObject]。覆写[RenderObjectElement.attachRenderObject]
+  /// 完成将[renderObject]添加到渲染树的实际工作。
   ///
-  /// The `newSlot` argument specifies the new value for this element's [slot].
+  /// `newSlot`参数指定了这个元素[slot]的新值。
   void attachRenderObject(dynamic newSlot) {
     assert(_slot == null);
     visitChildren((Element child) {
@@ -318,10 +340,8 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
     // global key is being duplicated, and we'll try to track that using the
     // _debugTrackElementThatWillNeedToBeRebuiltDueToGlobalKeyShenanigans call below.
     final Element? element = key._currentElement;
-    if (element == null)
-      return null;
-    if (!Widget.canUpdate(element.widget, newWidget))
-      return null;
+    if (element == null) return null;
+    if (!Widget.canUpdate(element.widget, newWidget)) return null;
     final Element? parent = element._parent;
     if (parent != null) {
       parent.forgetChild(element);
@@ -331,22 +351,17 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
     return element;
   }
 
-  /// Create an element for the given widget and add it as a child of this
-  /// element in the given slot.
+  /// 为给定的widget创建一个element，并将其作为该元素的子元素添加到给定的槽中。
   ///
-  /// This method is typically called by [updateChild] but can be called
-  /// directly by subclasses that need finer-grained control over creating
-  /// elements.
+  /// 这个方法通常被[updateChild]调用，但也可以被需要更精细地控制创建元素的子类直接调用。
   ///
-  /// If the given widget has a global key and an element already exists that
-  /// has a widget with that global key, this function will reuse that element
-  /// (potentially grafting it from another location in the tree or reactivating
-  /// it from the list of inactive elements) rather than creating a new element.
+  /// 如果给定的widget有一个全局键(global key)，并且已经存在一个具有该全局键的widget的元素，
+  /// 该函数将重用该元素（可能从树中的另一个位置嫁接或从非活动元素列表中重新激活它），而不是创建一个新元素。
   ///
-  /// The `newSlot` argument specifies the new value for this element's [slot].
+  /// `newSlot`参数指定了这个元素[slot]的新值。
   ///
-  /// The element returned by this function will already have been mounted and
-  /// will be in the "active" lifecycle state.
+  /// 该函数返回的元素将已经被挂载，并处于 "active "生命周期状态。
+  ///
   @protected
   Element inflateWidget(Widget newWidget, dynamic newSlot) {
     final Key? key = newWidget.key;
@@ -356,12 +371,12 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
       if (newChild != null) {
         //将非活动的element重新转为active状态
         newChild._activateWithParent(this, newSlot);
-        //使用widget更新找到的element
+        //使用新找到的element作为child
         final Element? updatedChild = updateChild(newChild, newWidget, newSlot);
         return updatedChild!;
       }
     }
-    //创建element
+    //到这里表示不能复用，创建element
     final Element newChild = newWidget.createElement();
     //挂载element
     newChild.mount(this, newSlot);
@@ -388,26 +403,23 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
     assert(child._parent == this);
     child._parent = null;
     child.detachRenderObject();
-    owner!._inactiveElements.add(child); // this eventually calls child.deactivate()
+    owner!._inactiveElements
+        .add(child); // this eventually calls child.deactivate()
   }
 
   // The children that have been forgotten by forgetChild. This will be used in
   // [update] to remove the global key reservations of forgotten children.
   final Set<Element> _debugForgottenChildrenWithGlobalKey = HashSet<Element>();
 
-  /// Remove the given child from the element's child list, in preparation for
-  /// the child being reused elsewhere in the element tree.
+  /// 将给定的子代Element从元素的child element列表中删除，为该子元素在元素树的其他地方被重
+  /// 用做准备。
   ///
-  /// This updates the child model such that, e.g., [visitChildren] does not
-  /// walk that child anymore.
+  /// 这会更新child的模型，例如，[visitChildren]不再访问那个child了。
   ///
-  /// The element will still have a valid parent when this is called, and the
-  /// child's [Element.slot] value will be valid in the context of that parent.
-  /// After this is called, [deactivateChild] is called to sever the link to
-  /// this object.
+  /// 调用此函数后，该元素仍有一个有效的父元素，子元素的[Element.slot]值将在该父元素的上下
+  /// 文中有效。该方法调用后，调用[deactivateChild]来切断这个对象的链接。
   ///
-  /// The [update] is responsible for updating or creating the new child that
-  /// will replace this [child].
+  /// [update] 负责更新或创建新的子代，以取代这个child
   @protected
   @mustCallSuper
   void forgetChild(Element child) {
@@ -443,17 +455,17 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// See the lifecycle documentation for [Element] for additional information.
   @mustCallSuper
   void activate() {
-    final bool hadDependencies = (_dependencies != null && _dependencies!.isNotEmpty) || _hadUnsatisfiedDependencies;
+    final bool hadDependencies =
+        (_dependencies != null && _dependencies!.isNotEmpty) ||
+            _hadUnsatisfiedDependencies;
     _lifecycleState = _ElementLifecycle.active;
     // We unregistered our dependencies in deactivate, but never cleared the list.
     // Since we're going to be reused, let's clear our list now.
     _dependencies?.clear();
     _hadUnsatisfiedDependencies = false;
     _updateInheritance();
-    if (_dirty)
-      owner!.scheduleBuildFor(this);
-    if (hadDependencies)
-      didChangeDependencies();
+    if (_dirty) owner!.scheduleBuildFor(this);
+    if (hadDependencies) didChangeDependencies();
   }
 
   /// Transition from the "active" to the "inactive" lifecycle state.
@@ -498,7 +510,8 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   @mustCallSuper
   void unmount() {
     assert(_lifecycleState == _ElementLifecycle.inactive);
-    assert(_widget != null); // Use the private property to avoid a CastError during hot reload.
+    assert(_widget !=
+        null); // Use the private property to avoid a CastError during hot reload.
     assert(depth != null);
     // Use the private property to avoid a CastError during hot reload.
     final Key? key = _widget.key;
@@ -514,8 +527,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   @override
   Size? get size {
     final RenderObject? renderObject = findRenderObject();
-    if (renderObject is RenderBox)
-      return renderObject.size;
+    if (renderObject is RenderBox) return renderObject.size;
     return null;
   }
 
@@ -524,7 +536,8 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   bool _hadUnsatisfiedDependencies = false;
 
   @override
-  InheritedWidget dependOnInheritedElement(InheritedElement ancestor, { Object? aspect }) {
+  InheritedWidget dependOnInheritedElement(InheritedElement ancestor,
+      {Object? aspect}) {
     assert(ancestor != null);
     _dependencies ??= HashSet<InheritedElement>();
     _dependencies!.add(ancestor);
@@ -533,9 +546,11 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   }
 
   @override
-  T? dependOnInheritedWidgetOfExactType<T extends InheritedWidget>({Object? aspect}) {
+  T? dependOnInheritedWidgetOfExactType<T extends InheritedWidget>(
+      {Object? aspect}) {
     assert(_debugCheckStateIsActiveForAncestorLookup());
-    final InheritedElement? ancestor = _inheritedWidgets == null ? null : _inheritedWidgets![T];
+    final InheritedElement? ancestor =
+        _inheritedWidgets == null ? null : _inheritedWidgets![T];
     if (ancestor != null) {
       assert(ancestor is InheritedElement);
       return dependOnInheritedElement(ancestor, aspect: aspect) as T;
@@ -545,9 +560,11 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   }
 
   @override
-  InheritedElement? getElementForInheritedWidgetOfExactType<T extends InheritedWidget>() {
+  InheritedElement?
+      getElementForInheritedWidgetOfExactType<T extends InheritedWidget>() {
     assert(_debugCheckStateIsActiveForAncestorLookup());
-    final InheritedElement? ancestor = _inheritedWidgets == null ? null : _inheritedWidgets![T];
+    final InheritedElement? ancestor =
+        _inheritedWidgets == null ? null : _inheritedWidgets![T];
     return ancestor;
   }
 
@@ -570,8 +587,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
     assert(_debugCheckStateIsActiveForAncestorLookup());
     Element? ancestor = _parent;
     while (ancestor != null) {
-      if (ancestor is StatefulElement && ancestor.state is T)
-        break;
+      if (ancestor is StatefulElement && ancestor.state is T) break;
       ancestor = ancestor._parent;
     }
     final StatefulElement? statefulAncestor = ancestor as StatefulElement?;
@@ -607,8 +623,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   void visitAncestorElements(bool visitor(Element element)) {
     assert(_debugCheckStateIsActiveForAncestorLookup());
     Element? ancestor = _parent;
-    while (ancestor != null && visitor(ancestor))
-      ancestor = ancestor._parent;
+    while (ancestor != null && visitor(ancestor)) ancestor = ancestor._parent;
   }
 
   /// Called when a dependency of this element changes.
@@ -654,10 +669,8 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// widgets dirty during event handlers before the frame begins, not during
   /// the build itself.
   void markNeedsBuild() {
-    if (_lifecycleState != _ElementLifecycle.active)
-      return;
-    if (dirty)
-      return;
+    if (_lifecycleState != _ElementLifecycle.active) return;
+    if (dirty) return;
     _dirty = true;
     owner!.scheduleBuildFor(this);
   }
@@ -666,8 +679,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   /// called to mark this element dirty, by [mount] when the element is first
   /// built, and by [update] when the widget has changed.
   void rebuild() {
-    if (_lifecycleState != _ElementLifecycle.active || !_dirty)
-      return;
+    if (_lifecycleState != _ElementLifecycle.active || !_dirty) return;
     Element? debugPreviousBuildTarget;
     performRebuild();
   }

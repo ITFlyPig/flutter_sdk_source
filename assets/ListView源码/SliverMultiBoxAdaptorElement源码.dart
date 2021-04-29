@@ -1,4 +1,10 @@
-class SliverMultiBoxAdaptorElement extends RenderObjectElement implements RenderSliverBoxChildManager {
+/// 为[SliverMultiBoxAdaptorWidget]延迟build children的element。
+///
+/// 实现了[RenderSliverBoxChildManager]接口，该接口让当前element可以管理
+/// [RenderSliverMultiBoxAdaptor]子类的children。
+///
+class SliverMultiBoxAdaptorElement extends RenderObjectElement
+    implements RenderSliverBoxChildManager {
   /// Creates an element that lazily builds children for the given widget.
   ///
   /// If `replaceMovedChildren` is set to true, a new child is proactively
@@ -10,17 +16,20 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
   /// layout offset of their children without looking at the layout offset of
   /// existing children this should be set to false (example:
   /// [RenderSliverFixedExtentList]) to avoid inflating unnecessary children.
-  SliverMultiBoxAdaptorElement(SliverMultiBoxAdaptorWidget widget, {bool replaceMovedChildren = false})
+  SliverMultiBoxAdaptorElement(SliverMultiBoxAdaptorWidget widget,
+      {bool replaceMovedChildren = false})
       : _replaceMovedChildren = replaceMovedChildren,
         super(widget);
 
   final bool _replaceMovedChildren;
 
   @override
-  SliverMultiBoxAdaptorWidget get widget => super.widget as SliverMultiBoxAdaptorWidget;
+  SliverMultiBoxAdaptorWidget get widget =>
+      super.widget as SliverMultiBoxAdaptorWidget;
 
   @override
-  RenderSliverMultiBoxAdaptor get renderObject => super.renderObject as RenderSliverMultiBoxAdaptor;
+  RenderSliverMultiBoxAdaptor get renderObject =>
+      super.renderObject as RenderSliverMultiBoxAdaptor;
 
   @override
   void update(covariant SliverMultiBoxAdaptorWidget newWidget) {
@@ -29,8 +38,8 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
     final SliverChildDelegate newDelegate = newWidget.delegate;
     final SliverChildDelegate oldDelegate = oldWidget.delegate;
     if (newDelegate != oldDelegate &&
-        (newDelegate.runtimeType != oldDelegate.runtimeType || newDelegate.shouldRebuild(oldDelegate)))
-      performRebuild();
+        (newDelegate.runtimeType != oldDelegate.runtimeType ||
+            newDelegate.shouldRebuild(oldDelegate))) performRebuild();
   }
 
   final SplayTreeMap<int, Element?> _childElements = SplayTreeMap<int, Element?>();
@@ -42,19 +51,24 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
     _currentBeforeChild = null;
     assert(_currentlyUpdatingChildIndex == null);
     try {
-      final SplayTreeMap<int, Element?> newChildren = SplayTreeMap<int, Element?>();
+      final SplayTreeMap<int, Element?> newChildren =
+          SplayTreeMap<int, Element?>();
       final Map<int, double> indexToLayoutOffset = HashMap<int, double>();
 
       void processElement(int index) {
         _currentlyUpdatingChildIndex = index;
-        if (_childElements[index] != null && _childElements[index] != newChildren[index]) {
+        if (_childElements[index] != null &&
+            _childElements[index] != newChildren[index]) {
           // This index has an old child that isn't used anywhere and should be deactivated.
-          _childElements[index] = updateChild(_childElements[index], null, index);
+          _childElements[index] =
+              updateChild(_childElements[index], null, index);
         }
-        final Element? newChild = updateChild(newChildren[index], _build(index), index);
+        final Element? newChild =
+            updateChild(newChildren[index], _build(index), index);
         if (newChild != null) {
           _childElements[index] = newChild;
-          final SliverMultiBoxAdaptorParentData parentData = newChild.renderObject!.parentData! as SliverMultiBoxAdaptorParentData;
+          final SliverMultiBoxAdaptorParentData parentData = newChild
+              .renderObject!.parentData! as SliverMultiBoxAdaptorParentData;
           if (index == 0) {
             parentData.layoutOffset = 0.0;
           } else if (indexToLayoutOffset.containsKey(index)) {
@@ -66,19 +80,21 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
           _childElements.remove(index);
         }
       }
+
       for (final int index in _childElements.keys.toList()) {
         final Key? key = _childElements[index]!.widget.key;
-        final int? newIndex = key == null ? null : widget.delegate.findIndexByKey(key);
+        final int? newIndex =
+            key == null ? null : widget.delegate.findIndexByKey(key);
         final SliverMultiBoxAdaptorParentData? childParentData =
-        _childElements[index]!.renderObject?.parentData as SliverMultiBoxAdaptorParentData?;
+            _childElements[index]!.renderObject?.parentData
+                as SliverMultiBoxAdaptorParentData?;
 
         if (childParentData != null && childParentData.layoutOffset != null)
           indexToLayoutOffset[index] = childParentData.layoutOffset!;
 
         if (newIndex != null && newIndex != index) {
           // The layout offset of the child being moved is no longer accurate.
-          if (childParentData != null)
-            childParentData.layoutOffset = null;
+          if (childParentData != null) childParentData.layoutOffset = null;
 
           newChildren[newIndex] = _childElements[index];
           if (_replaceMovedChildren) {
@@ -92,7 +108,8 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
         }
       }
 
-      renderObject.debugChildIntegrityEnabled = false; // Moving children will temporary violate the integrity.
+      renderObject.debugChildIntegrityEnabled =
+          false; // Moving children will temporary violate the integrity.
       newChildren.keys.forEach(processElement);
       if (_didUnderflow) {
         final int lastKey = _childElements.lastKey() ?? -1;
@@ -106,24 +123,30 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
     }
   }
 
+  // build构建Widget
   Widget? _build(int index) {
     return widget.delegate.build(this, index);
   }
 
   @override
-  void createChild(int index, { required RenderBox? after }) {
+  void createChild(int index, {required RenderBox? after}) {
     assert(_currentlyUpdatingChildIndex == null);
     owner!.buildScope(this, () {
+      // 如果after为空，则表示需要插入到头部
       final bool insertFirst = after == null;
-      assert(insertFirst || _childElements[index-1] != null);
-      _currentBeforeChild = insertFirst ? null : (_childElements[index-1]!.renderObject as RenderBox?);
+      //获取当前需要的child的前一个child
+      _currentBeforeChild = insertFirst
+          ? null
+          : (_childElements[index - 1]!.renderObject as RenderBox?);
       Element? newChild;
       try {
         _currentlyUpdatingChildIndex = index;
+        //更新child
         newChild = updateChild(_childElements[index], _build(index), index);
       } finally {
         _currentlyUpdatingChildIndex = null;
       }
+      //更新对应的element
       if (newChild != null) {
         _childElements[index] = newChild;
       } else {
@@ -134,12 +157,24 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
 
   @override
   Element? updateChild(Element? child, Widget? newWidget, dynamic newSlot) {
-    final SliverMultiBoxAdaptorParentData? oldParentData = child?.renderObject?.parentData as SliverMultiBoxAdaptorParentData?;
-    final Element? newChild = super.updateChild(child, newWidget, newSlot);
-    final SliverMultiBoxAdaptorParentData? newParentData = newChild?.renderObject?.parentData as SliverMultiBoxAdaptorParentData?;
+    final SliverMultiBoxAdaptorParentData? oldParentData =
+        child?.renderObject?.parentData as SliverMultiBoxAdaptorParentData?;
+    // 当newWidget == null：
+    // 将Element#child设置为null
+    // 将child.detachRenderObject();将Element和RenderObject分离，并将RenderObjec从渲染树分离
+    //  child.deactivate()将Element设置为无效，将element移到非活跃队列
 
+    //使用配置widget更新element
+    // 调用Element#updateChild
+    final Element? newChild = super.updateChild(child, newWidget, newSlot);
+
+    final SliverMultiBoxAdaptorParentData? newParentData =
+        newChild?.renderObject?.parentData as SliverMultiBoxAdaptorParentData?;
     // Preserve the old layoutOffset if the renderObject was swapped out.
-    if (oldParentData != newParentData && oldParentData != null && newParentData != null) {
+    if (oldParentData != newParentData &&
+        oldParentData != null &&
+        newParentData != null) {
+      // 获取之前的偏移量
       newParentData.layoutOffset = oldParentData.layoutOffset;
     }
     return newChild;
@@ -160,54 +195,55 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
     owner!.buildScope(this, () {
       try {
         _currentlyUpdatingChildIndex = index;
-        // 从树中删除了，就不显示了
+        // 将element移到非活跃队列，将renderobject从渲染树删除
         final Element? result = updateChild(_childElements[index], null, index);
       } finally {
         _currentlyUpdatingChildIndex = null;
       }
+      //删除对应的element
       _childElements.remove(index);
     });
   }
 
   static double _extrapolateMaxScrollOffset(
-      int firstIndex,
-      int lastIndex,
-      double leadingScrollOffset,
-      double trailingScrollOffset,
-      int childCount,
-      ) {
-    if (lastIndex == childCount - 1)
-      return trailingScrollOffset;
+    int firstIndex,
+    int lastIndex,
+    double leadingScrollOffset,
+    double trailingScrollOffset,
+    int childCount,
+  ) {
+    if (lastIndex == childCount - 1) return trailingScrollOffset;
     final int reifiedCount = lastIndex - firstIndex + 1;
-    final double averageExtent = (trailingScrollOffset - leadingScrollOffset) / reifiedCount;
+    final double averageExtent =
+        (trailingScrollOffset - leadingScrollOffset) / reifiedCount;
     final int remainingCount = childCount - lastIndex - 1;
     return trailingScrollOffset + averageExtent * remainingCount;
   }
 
   @override
   double estimateMaxScrollOffset(
-      SliverConstraints? constraints, {
-        int? firstIndex,
-        int? lastIndex,
-        double? leadingScrollOffset,
-        double? trailingScrollOffset,
-      }) {
+    SliverConstraints? constraints, {
+    int? firstIndex,
+    int? lastIndex,
+    double? leadingScrollOffset,
+    double? trailingScrollOffset,
+  }) {
     final int? childCount = estimatedChildCount;
-    if (childCount == null)
-      return double.infinity;
+    if (childCount == null) return double.infinity;
     return widget.estimateMaxScrollOffset(
-      constraints,
-      firstIndex!,
-      lastIndex!,
-      leadingScrollOffset!,
-      trailingScrollOffset!,
-    ) ?? _extrapolateMaxScrollOffset(
-      firstIndex,
-      lastIndex,
-      leadingScrollOffset,
-      trailingScrollOffset,
-      childCount,
-    );
+          constraints,
+          firstIndex!,
+          lastIndex!,
+          leadingScrollOffset!,
+          trailingScrollOffset!,
+        ) ??
+        _extrapolateMaxScrollOffset(
+          firstIndex,
+          lastIndex,
+          leadingScrollOffset,
+          trailingScrollOffset,
+          childCount,
+        );
   }
 
   /// The best available estimate of [childCount], or null if no estimate is available.
@@ -244,11 +280,10 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
         } else {
           throw FlutterError(
               'Could not find the number of children in ${widget.delegate}.\n'
-                  'The childCount getter was called (implying that the delegate\'s builder returned null '
-                  'for a positive index), but even building the child with index $hi (the maximum '
-                  'possible integer) did not return null. Consider implementing childCount to avoid '
-                  'the cost of searching for the final child.'
-          );
+              'The childCount getter was called (implying that the delegate\'s builder returned null '
+              'for a positive index), but even building the child with index $hi (the maximum '
+              'possible integer) did not return null. Consider implementing childCount to avoid '
+              'the cost of searching for the final child.');
         }
       }
       while (hi - lo > 1) {
@@ -288,7 +323,8 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
   @override
   void didAdoptChild(RenderBox child) {
     assert(_currentlyUpdatingChildIndex != null);
-    final SliverMultiBoxAdaptorParentData childParentData = child.parentData! as SliverMultiBoxAdaptorParentData;
+    final SliverMultiBoxAdaptorParentData childParentData =
+        child.parentData! as SliverMultiBoxAdaptorParentData;
     childParentData.index = _currentlyUpdatingChildIndex;
   }
 
@@ -301,27 +337,17 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
 
   @override
   void insertRenderObjectChild(covariant RenderObject child, int slot) {
-    assert(slot != null);
-    assert(_currentlyUpdatingChildIndex == slot);
-    assert(renderObject.debugValidateChild(child));
     renderObject.insert(child as RenderBox, after: _currentBeforeChild);
-    assert(() {
-      final SliverMultiBoxAdaptorParentData childParentData = child.parentData! as SliverMultiBoxAdaptorParentData;
-      assert(slot == childParentData.index);
-      return true;
-    }());
   }
 
   @override
-  void moveRenderObjectChild(covariant RenderObject child, int oldSlot, int newSlot) {
-    assert(newSlot != null);
-    assert(_currentlyUpdatingChildIndex == newSlot);
+  void moveRenderObjectChild(
+      covariant RenderObject child, int oldSlot, int newSlot) {
     renderObject.move(child as RenderBox, after: _currentBeforeChild);
   }
 
   @override
   void removeRenderObjectChild(covariant RenderObject child, int slot) {
-    assert(_currentlyUpdatingChildIndex != null);
     renderObject.remove(child as RenderBox);
   }
 
@@ -336,7 +362,8 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
   @override
   void debugVisitOnstageChildren(ElementVisitor visitor) {
     _childElements.values.cast<Element>().where((Element child) {
-      final SliverMultiBoxAdaptorParentData parentData = child.renderObject!.parentData! as SliverMultiBoxAdaptorParentData;
+      final SliverMultiBoxAdaptorParentData parentData =
+          child.renderObject!.parentData! as SliverMultiBoxAdaptorParentData;
       final double itemExtent;
       switch (renderObject.constraints.axis) {
         case Axis.horizontal:
@@ -348,8 +375,11 @@ class SliverMultiBoxAdaptorElement extends RenderObjectElement implements Render
       }
 
       return parentData.layoutOffset != null &&
-          parentData.layoutOffset! < renderObject.constraints.scrollOffset + renderObject.constraints.remainingPaintExtent &&
-          parentData.layoutOffset! + itemExtent > renderObject.constraints.scrollOffset;
+          parentData.layoutOffset! <
+              renderObject.constraints.scrollOffset +
+                  renderObject.constraints.remainingPaintExtent &&
+          parentData.layoutOffset! + itemExtent >
+              renderObject.constraints.scrollOffset;
     }).forEach(visitor);
   }
 }

@@ -6,42 +6,33 @@
 /// （total scroll offset extent ）。
 ///
 abstract class RenderSliverBoxChildManager {
-  /// Called during layout when a new child is needed. The child should be
-  /// inserted into the child list in the appropriate position, after the
-  /// `after` child (at the start of the list if `after` is null). Its index and
-  /// scroll offsets will automatically be set appropriately.
+  /// 在布局过程中，当需要一个新的child时，调用该函数。该child应该被插入到child列表的适当
+  /// 位置，在 "after "子代之后（如果 "after "为空，则插入到列表的开头）。它的索引和滚动偏
+  /// 移量将自动被适当设置。
   ///
-  /// The `index` argument gives the index of the child to show. It is possible
-  /// for negative indices to be requested. For example: if the user scrolls
-  /// from child 0 to child 10, and then those children get much smaller, and
-  /// then the user scrolls back up again, this method will eventually be asked
-  /// to produce a child for index -1.
+  /// `index`参数给出了要显示的孩子的索引。负也是可以请求的。例如：如果用户从子代0滚动到子
+  /// 代10，然后这些子代变得更小，然后用户再次向上滚动，这个方法最终会被要求生成一个索引为-1的子代。
   ///
-  /// If no child corresponds to `index`, then do nothing.
+  /// 如果没有与`index`对应的子代，则什么也不做。
   ///
-  /// Which child is indicated by index zero depends on the [GrowthDirection]
-  /// specified in the `constraints` of the [RenderSliverMultiBoxAdaptor]. For
-  /// example if the children are the alphabet, then if
-  /// [SliverConstraints.growthDirection] is [GrowthDirection.forward] then
-  /// index zero is A, and index 25 is Z. On the other hand if
-  /// [SliverConstraints.growthDirection] is [GrowthDirection.reverse] then
-  /// index zero is Z, and index 25 is A.
+  /// 索引0表示哪个子代取决于[RenderSliverMultiBoxAdaptor]的`constraints`中指定的[GrowthDirection]。
+  /// 例如，如果子代是字母，那么如果[SliverConstraints.growthDirection]是[GrowthDirection.forward]，
+  /// 那么索引0是A，索引25是Z。另一方面，如果[SliverConstraints.growthDirection]是[GrowthDirection.reverse]，
+  /// 那么指数0是Z，指数25是A。
   ///
-  /// During a call to [createChild] it is valid to remove other children from
-  /// the [RenderSliverMultiBoxAdaptor] object if they were not created during
-  /// this frame and have not yet been updated during this frame. It is not
-  /// valid to add any other children to this render object.
-  void createChild(int index, { required RenderBox? after });
+  /// 在调用[createChild]的过程中，如果[RenderSliverMultiBoxAdaptor]对象的其他子代没有
+  /// 在这一帧中创建，并且在这一帧中还没有更新，那么从该对象中删除其他子代是有效的。在此渲染
+  /// 对象中添加任何其他子对象是无效的。
+  void createChild(int index, {required RenderBox? after});
 
-  /// Remove the given child from the child list.
+  /// 将child从child列表移除
   ///
-  /// Called by [RenderSliverMultiBoxAdaptor.collectGarbage], which itself is
-  /// called from [RenderSliverMultiBoxAdaptor]'s `performLayout`.
+  /// 该方法会被[RenderSliverMultiBoxAdaptor.collectGarbage]调用，
+  /// 同时垃圾收集又会被[RenderSliverMultiBoxAdaptor]的`performLayout`调用。
   ///
-  /// The index of the given child can be obtained using the
-  /// [RenderSliverMultiBoxAdaptor.indexOf] method, which reads it from the
-  /// [SliverMultiBoxAdaptorParentData.index] field of the child's
-  /// [RenderObject.parentData].
+  /// 传入的child的index可以通过[RenderSliverMultiBoxAdaptor.indexOf]获取，该方法读取
+  /// [RenderObject.parentData]的[SliverMultiBoxAdaptorParentData.index]字段。
+  ///
   void removeChild(RenderBox child);
 
   /// Called to estimate the total scrollable extents of this object.
@@ -50,12 +41,12 @@ abstract class RenderSliverBoxChildManager {
   /// earliest possible index to the end of the child with the last possible
   /// index.
   double estimateMaxScrollOffset(
-      SliverConstraints constraints, {
-        int? firstIndex,
-        int? lastIndex,
-        double? leadingScrollOffset,
-        double? trailingScrollOffset,
-      });
+    SliverConstraints constraints, {
+    int? firstIndex,
+    int? lastIndex,
+    double? leadingScrollOffset,
+    double? trailingScrollOffset,
+  });
 
   /// Called to obtain a precise measure of the total number of children.
   ///
@@ -92,10 +83,10 @@ abstract class RenderSliverBoxChildManager {
 
   /// Called at the beginning of layout to indicate that layout is about to
   /// occur.
-  void didStartLayout() { }
+  void didStartLayout() {}
 
   /// Called at the end of layout to indicate that layout is now complete.
-  void didFinishLayout() { }
+  void didFinishLayout() {}
 
   /// In debug mode, asserts that this manager is not expecting any
   /// modifications to the [RenderSliverMultiBoxAdaptor]'s child list.

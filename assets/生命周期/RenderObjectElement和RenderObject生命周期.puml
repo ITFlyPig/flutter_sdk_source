@@ -1,0 +1,50 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+
+FrameWork -> RenderObjectElement:mount():将element挂载
+RenderObjectElement -> RenderObjectWidget:createRenderObject():创建对应的RenderObject
+RenderObjectWidget --> RenderObjectElement:返回RenderObject
+RenderObjectElement -> RenderObjectElement:attachRenderObject():将RenderObject附着
+activate RenderObjectElement
+RenderObjectElement -> RenderObjectElement:_findAncestorRenderObjectElement:找到祖先RenderObjectElement
+activate RenderObjectElement
+RenderObjectElement -> RenderObjectElement:_ancestorRenderObjectElement?.insertRenderObjectChild(renderObject, newSlot)\n调用祖先RenderObjectElement将RenderObject插入
+activate RenderObjectElement
+RenderObjectElement -> RenderSliverMultiBoxAdaptor:insert(RenderBox child, { RenderBox? after })
+RenderSliverMultiBoxAdaptor -> ContainerRenderObjectMixin:insert(ChildType child, { ChildType? after })
+ContainerRenderObjectMixin -> RenderObject:adoptChild拾取一个child
+ContainerRenderObjectMixin -> ContainerRenderObjectMixin :_insertIntoChildList:插入到自己的列表
+deactivate RenderObjectElement
+deactivate RenderObjectElement
+deactivate RenderObjectElement
+
+
+FrameWork -> 父Element:deactivateChild(child):\n将element移到inactive列表，将它的render object从渲染树移除
+父Element -> 子Element:detachRenderObject():将渲染对象从渲染树移除
+子Element -> RenderObjectElement:detachRenderObject()
+activate RenderObjectElement
+RenderObjectElement -> RenderObjectElement:removeRenderObjectChild(child):将RenderObject的child移除
+activate RenderObjectElement
+RenderObjectElement -> RenderSliverMultiBoxAdaptor:remove( child)
+activate RenderSliverMultiBoxAdaptor
+RenderSliverMultiBoxAdaptor -> ContainerRenderObjectMixin:remove()
+activate ContainerRenderObjectMixin
+ContainerRenderObjectMixin -> ContainerRenderObjectMixin:_removeFromChildList():将child从列表移除
+activate ContainerRenderObjectMixin
+deactivate ContainerRenderObjectMixin
+ContainerRenderObjectMixin -> RenderObject:dropChild(child):丢弃一个child
+activate RenderObject
+deactivate RenderObject
+deactivate ContainerRenderObjectMixin
+deactivate RenderSliverMultiBoxAdaptor
+deactivate RenderObjectElement
+deactivate RenderObjectElement
+父Element -> 子Element:deactivate()
+
+
+FrameWork -> RenderObjectElement:unmount():将element卸载
+activate RenderObjectElement
+RenderObjectElement -> RenderObjectWidget:didUnmountRenderObject(covariant RenderObject renderObject)
+deactivate RenderObjectElement
+@enduml
