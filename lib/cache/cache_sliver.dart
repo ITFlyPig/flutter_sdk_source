@@ -21,6 +21,7 @@ class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
       print('需要删除element');
       // 将renderobject从child list移除
       child.detachRenderObject();
+      child.deactivate();
       // 放入到cache中
       _elementCache.add(child);
       print('删除element，当前缓存个数:${_elementCache.length}');
@@ -50,6 +51,7 @@ class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
       } else {//找到缓存的element
         print('使用找到的缓存，当前缓存个数：${_elementCache.length}');
         cachedElement.attachRenderObject(newSlot);
+        cachedElement.activate();
         Element? newElement = super.updateChild(cachedElement, newWidget, newSlot);
         print('从缓存获取到的element：${cachedElement.hashCode}, updateChild更新后返回的element：${newElement?.hashCode}');
         return newElement;
