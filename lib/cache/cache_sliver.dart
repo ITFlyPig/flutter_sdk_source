@@ -2,14 +2,25 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'dart:math' as math;
 
-class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement {
+import 'package:flutter/scheduler.dart';
+
+class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement implements WRenderSliverBoxChildManager{
 
   final List<Element> _elementCache = <Element>[];
+  int _next = 0;
+  bool _shouldPlaceHolder = false;
+  List<int> _placeHolders = [];//记录目前使用简单配置创建的index
 
   SliverMultiBoxAdaptorElementWithCache(SliverMultiBoxAdaptorWidget widget) : super(widget);
 
+  @override
+  void mount(Element? parent, newSlot) {
+    super.mount(parent, newSlot);
+
+  }
 
   @override
   Element? updateChild(Element? child, Widget? newWidget, newSlot) {
@@ -27,10 +38,13 @@ class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
       print('删除element，当前缓存个数:${_elementCache.length}');
       return null;
     } else if (child == null && newWidget != null) {//需要创建element
+
+      // 如果现在时间比较紧张，则使用简单的widget去创建element
+
       //尝试从cache中获取，参考_retakeInactiveElement的逻辑来编写
 
       // 遍历cache，获取能使用newWidget更新的element
-      print('需要创建element');
+      print('需要创建一个element');
 
       Element? cachedElement;
       for(int i = 0; i < _elementCache.length; i++) {
@@ -46,8 +60,41 @@ class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
 
       //未找到，则直接使用原来的方法创建一个
       if (cachedElement == null) {
-        print('新创建一个element');
+        //确定使用原来的还是替换了，使用简单的widget
+        // if (_hasSufficientTime()) {
+        //   // 还是使用原来的配置
+        //   print('使用原来的配置');
+        // } else {
+        //   print('使用简单的配置');
+        //   // 使用简单的配置widget
+        //   WSliverChildBuilderDelegate delegate = widget.delegate as WSliverChildBuilderDelegate;
+        //   newWidget = delegate.buildPlaceHolder(this, newSlot);
+        //   //因为使用站位的配置，所以这里标记还需要刷新
+        //   // markNeedsBuild();
+        //   SchedulerBinding.instance!.addPostFrameCallback((timeStamp) {
+        //     markNeedsBuild();
+        //   });
+        // }
+
+        if (!_shouldPlaceHolder) {
+          _shouldPlaceHolder = true;
+          print('使用原来的配置');
+        } else {
+          print('使用简单的配置');
+          WSliverChildBuilderDelegate delegate = widget.delegate as WSliverChildBuilderDelegate;
+          newWidget = delegate.buildPlaceHolder(this, newSlot);
+          if (!_placeHolders.contains(newSlot)) {
+            _placeHolders.add(newSlot);
+          }
+          SchedulerBinding.instance!.addPostFrameCallback((timeStamp) {
+            markNeedsBuild();
+            _shouldPlaceHolder = false;
+            print('一帧结束');
+          });
+        }
+
         return super.updateChild(child, newWidget, newSlot);
+
       } else {//找到缓存的element
         print('使用找到的缓存，当前缓存个数：${_elementCache.length}');
         cachedElement.attachRenderObject(newSlot);
@@ -58,14 +105,62 @@ class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
       }
     } else {
       print('更新element');
-      return super.updateChild(child, newWidget, newSlot);
+      Element? updatedElement;
+      if (!_placeHolders.contains(newSlot)) {
+        //使用原来的配置更新
+        print('使用原来配置更新element');
+      } else {
+        if (!_shouldPlaceHolder) {
+          _placeHolders.remove(newSlot);
+          _shouldPlaceHolder = true;
+          //使用原来的配置更新
+          print('使用原来配置更新element');
+        } else {
+          //还是使用简单的配置更新
+          print('使用简单配置更新element');
+          WSliverChildBuilderDelegate delegate = widget.delegate as WSliverChildBuilderDelegate;
+          newWidget = delegate.buildPlaceHolder(this, newSlot);
+          if (!_placeHolders.contains(newSlot)) {
+            _placeHolders.add(newSlot);
+          }
+
+          SchedulerBinding.instance!.addPostFrameCallback((timeStamp) {
+            _shouldPlaceHolder = false;
+            markNeedsBuild();
+            print('一帧结束');
+          });
+        }
+      }
+      updatedElement = super.updateChild(child, newWidget, newSlot);
+
+      return updatedElement;
     }
 
+  }
+
+  @override
+  void insertAndLayoutChildCost(int index, Duration cost) {
+    print('insertAndLayoutChildCost消耗的时间：${cost.inMilliseconds} child的索引：$index');
+    //将消耗的时间
+    _totalCost += cost.inMilliseconds;
+  }
+
+  /// 是否还有充足的时间
+  bool _hasSufficientTime() {
+    // print('是否还有足够的时间：${_totalCost < 16}  当前总的花费时间:$_totalCost');
+    // return _totalCost < 16;
+    return _shouldPlaceHolder;
+  }
+
+  int _totalCost = 0;
+  @override
+  void startLayout() {
+    _totalCost = 0;
   }
 }
 
 
-//====================================================================================================================================
+//=============================================================WSliverList=======================================================================
 
 class WSliverList extends SliverList {
   const WSliverList({
@@ -77,10 +172,90 @@ class WSliverList extends SliverList {
   SliverMultiBoxAdaptorElement createElement() {
     return SliverMultiBoxAdaptorElementWithCache(this);
   }
+
+  @override
+  RenderSliverList createRenderObject(BuildContext context) {
+    final SliverMultiBoxAdaptorElement element = context as SliverMultiBoxAdaptorElement;
+    return WRenderSliverList(childManager: element);
+  }
+}
+
+//=============================================================WRenderSliverList=======================================================================
+//主要实现布局和绘制的RenderObject
+class WRenderSliverList extends RenderSliverList {
+  late WRenderSliverBoxChildManager _childManager;
+
+  WRenderSliverList({
+    required RenderSliverBoxChildManager childManager,
+  }) : super(childManager: childManager) {
+    _childManager = childManager as WRenderSliverBoxChildManager;
+  }
+
+
+  @override
+  bool addInitialChild({int index = 0, double layoutOffset = 0.0}) {
+
+    DateTime pre = DateTime.now();
+    bool? res = super.addInitialChild(index: index, layoutOffset: layoutOffset);
+    DateTime now = DateTime.now();
+    //计算插入和布局一个child所消耗的时间
+    Duration diff = now.difference(pre);
+    _childManager.insertAndLayoutChildCost(0, diff);
+    return res;
+  }
+
+
+  @override
+  RenderBox? insertAndLayoutChild(BoxConstraints childConstraints, {required RenderBox? after, bool parentUsesSize = false}) {
+    DateTime pre = DateTime.now();
+    RenderBox? child = super.insertAndLayoutChild(childConstraints, after: after, parentUsesSize: parentUsesSize );
+    DateTime now = DateTime.now();
+    //计算插入和布局一个child所消耗的时间
+    Duration diff = now.difference(pre);
+    if (child != null) {
+      _childManager.insertAndLayoutChildCost(indexOf(child), diff);
+    }
+    return child;
+  }
+
+  @override
+  RenderBox? insertAndLayoutLeadingChild(BoxConstraints childConstraints, {bool parentUsesSize = false}) {
+    DateTime pre = DateTime.now();
+    RenderBox? child = super.insertAndLayoutLeadingChild(childConstraints, parentUsesSize: parentUsesSize);
+    DateTime now = DateTime.now();
+    //计算插入和布局一个child所消耗的时间
+    Duration diff = now.difference(pre);
+    if (child != null) {
+      _childManager.insertAndLayoutChildCost(indexOf(child), diff);
+    }
+    return child;
+  }
+
+  @override
+  void performLayout() {
+    _childManager.startLayout();
+    super.performLayout();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    super.paint(context, offset);
+  }
+}
+
+//=============================================================WRenderSliverBoxChildManager=======================================================================
+// 增强的能力
+abstract class WRenderSliverBoxChildManager extends RenderSliverBoxChildManager {
+
+  /// 增加和布局一个child所消耗的时间
+  void insertAndLayoutChildCost(int index,Duration cost);
+  /// 布局开始的回调
+  void startLayout();
+
 }
 
 
-//====================================================================================================================================
+//=====================================================================WListView===============================================================
 class WListView extends BoxScrollView {
   /// Creates a scrollable, linear array of widgets from an explicit [List].
   ///
@@ -200,7 +375,8 @@ class WListView extends BoxScrollView {
     Clip clipBehavior = Clip.hardEdge,
   }) : assert(itemCount == null || itemCount >= 0),
         assert(semanticChildCount == null || semanticChildCount <= itemCount!),
-        childrenDelegate = SliverChildBuilderDelegate(
+        childrenDelegate = WSliverChildBuilderDelegate(
+          null,
           itemBuilder,
           childCount: itemCount,
           addAutomaticKeepAlives: addAutomaticKeepAlives,
@@ -495,4 +671,49 @@ class WListView extends BoxScrollView {
   static int _computeActualChildCount(int itemCount) {
     return math.max(0, itemCount * 2 - 1);
   }
+}
+
+//=====================================================================WSliverChildDelegate===============================================================
+typedef PlaceHolderBuilder = Widget? Function(BuildContext context, int index);
+int _kDefaultSemanticIndexCallback(Widget _, int localIndex) => localIndex;
+
+/// 创建child的代理，增强能力，增加placeholder child的创建
+abstract class WSliverChildDelegate extends SliverChildDelegate {
+
+  Widget? buildPlaceHolder(BuildContext context, int index);
+}
+
+
+class WSliverChildBuilderDelegate extends SliverChildBuilderDelegate implements WSliverChildDelegate{
+  //不传PlaceHolderBuilder就表示不需要分帧功能
+  PlaceHolderBuilder? placeHolderBuilder;
+
+  WSliverChildBuilderDelegate(this.placeHolderBuilder, builder, {
+    ChildIndexGetter? findChildIndexCallback,
+    int? childCount,
+    bool addAutomaticKeepAlives = true,
+    bool addRepaintBoundaries = true,
+    bool addSemanticIndexes = true,
+    SemanticIndexCallback semanticIndexCallback = _kDefaultSemanticIndexCallback,
+    int semanticIndexOffset = 0
+  })
+      : super(builder,
+      findChildIndexCallback: findChildIndexCallback,
+    childCount: childCount,
+    addAutomaticKeepAlives: addAutomaticKeepAlives,
+    addRepaintBoundaries: addRepaintBoundaries,
+    addSemanticIndexes: addSemanticIndexes,
+    semanticIndexCallback: semanticIndexCallback,
+    semanticIndexOffset: semanticIndexOffset
+  );
+
+  @override
+  Widget? buildPlaceHolder(BuildContext context, int index) {
+    Widget? widget = placeHolderBuilder?.call(context, index);
+    if (widget == null) return SizedBox(
+      height: 100,
+    );
+    return widget;
+  }
+
 }
