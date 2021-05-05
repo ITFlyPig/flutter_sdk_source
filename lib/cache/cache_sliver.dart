@@ -31,6 +31,7 @@ class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
     // 如果newWidget未null，表示需要移除对应的element
     // 将移除的element放入到cache
     // return super.updateChild(child, newWidget, newSlot);
+
     print('========================开始 index：$newSlot');
     SchedulerBinding.instance!.addPostFrameCallback((timeStamp) {
       _canUseOrigin = true;
