@@ -38,84 +38,98 @@ class _ListViewTestPageState extends State<ListViewTestPage> {
         body: Container(
           child: WListView.builder(
             itemBuilder: (_, index) {
-              return Container(
-                color: Colors.black12,
-                margin: EdgeInsets.only(top: 6),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Expanded(child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Image.network(randomImage()),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(20),
-                                child: Image.network(randomImage()),
-                              )
-                            ],
-                          ),
-                            flex: 1,
-                          ),
-                          Expanded(
-                            child: Column(
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.white30, width: 5),
-                                      borderRadius: BorderRadius.all(Radius.circular(40))
-                                  ),
-                                  child: Text('btnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtn:$index'),
-                                ),
-                                Container(
-                                  child: Text('btn:$index'),
-                                ),
-                                Container(
-                                  child: Text('btn:$index'),
-                                ),
-                                Container(
-                                  decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.lightBlue, width: 5),
-                                      borderRadius: BorderRadius.all(Radius.circular(10))
-                                  ),
-                                  child: Text('btnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtn:$index', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),),
-                                ),
-                                Container(
-                                  decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.amber, width: 5),
-                                      borderRadius: BorderRadius.all(Radius.circular(10))
-                                  ),
-                                  child: Text('btn:$index'),
-                                ),
-                                TextField(
-                                  decoration: InputDecoration(
-                                      hintText: 'hint:$index'
-                                  ),
-                                )
-                              ],
-
-                            ),
-                            flex: 1,
-                          )
-                        ],
-                      ),
-                      Container(
-                        margin: EdgeInsets.only(top: 6),
-                        width: double.infinity,
-                        height: 1,
-                        color: Colors.black87,
-                      )
-
-                    ],
-                  )
-              );
+              return _buildComplexItem(index);
+              // return _buildSimpleItem();
             },
             itemCount: _list?.length,
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildSimpleItem() {
+    return SizedBox(
+      height: 200,
+      width: double.infinity,
+    );
+  }
+
+  Widget _buildComplexItem(int index) {
+    return Container(
+        color: Colors.black12,
+        margin: EdgeInsets.all(10),
+        child: Column(
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.network(randomImage()),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.network(randomImage()),
+                      )
+                    ],
+                  ),
+                  flex: 1,
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                            border: Border.all(color: Colors.white30, width: 5),
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(40))),
+                        child: Text(
+                            'btnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtn:$index'),
+                      ),
+                      Container(
+                        child: Text('btn:$index'),
+                      ),
+                      Container(
+                        child: Text('btn:$index'),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                            border:
+                                Border.all(color: Colors.lightBlue, width: 5),
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(10))),
+                        child: Text(
+                          'btnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtnbtn:$index',
+                          style: TextStyle(
+                              color: Colors.blue, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                            border: Border.all(color: Colors.amber, width: 5),
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(10))),
+                        child: Text('btn:$index'),
+                      ),
+                      TextField(
+                        decoration: InputDecoration(hintText: 'hint:$index'),
+                      )
+                    ],
+                  ),
+                  flex: 1,
+                )
+              ],
+            ),
+            Container(
+              margin: EdgeInsets.only(top: 6),
+              width: double.infinity,
+              height: 1,
+              color: Colors.black87,
+            )
+          ],
+        ));
   }
 
   String randomImage() {

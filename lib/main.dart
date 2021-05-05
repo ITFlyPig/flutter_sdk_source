@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'cache/custom_scroll_test_page.dart';
 import 'listview_test_page.dart';
 
 void main() {
@@ -78,7 +77,18 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       // body: ChooseCalendar(start: DateTime.now(), end: DateTime(2021, 5)),
-      body: ListViewTestPage(),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        child: OutlinedButton(
+          child: Text('点击'),
+          onPressed: () {
+            Navigator.of(context).push(new MaterialPageRoute(builder: (_) {
+              return ListViewTestPage();
+            }));
+          },
+        ),
+      ),
     );
   }
 }

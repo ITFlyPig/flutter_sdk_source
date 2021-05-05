@@ -1,25 +1,28 @@
+import 'dart:collection';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'dart:math' as math;
-
 import 'package:flutter/scheduler.dart';
 
-class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement implements WRenderSliverBoxChildManager{
-
+class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
+    implements WRenderSliverBoxChildManager {
   final List<Element> _elementCache = <Element>[];
   int _next = 0;
   bool _shouldPlaceHolder = false;
-  List<int> _placeHolders = [];//记录目前使用简单配置创建的index
+  List<int> _placeHolders = []; //记录目前使用简单配置创建的index
+  bool _canUseOrigin = true;
+  Map<int, bool> _placeHolderMap = HashMap(); //记录使用placeholder的位置
+  int _placeHolderNum = 0;
 
-  SliverMultiBoxAdaptorElementWithCache(SliverMultiBoxAdaptorWidget widget) : super(widget);
+  SliverMultiBoxAdaptorElementWithCache(SliverMultiBoxAdaptorWidget widget)
+      : super(widget);
 
   @override
   void mount(Element? parent, newSlot) {
     super.mount(parent, newSlot);
-
   }
 
   @override
@@ -27,120 +30,72 @@ class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
     // return super.updateChild(child, newWidget, newSlot);
     // 如果newWidget未null，表示需要移除对应的element
     // 将移除的element放入到cache
-
-    if (child != null && newWidget == null) {//删除element
-      print('需要删除element');
-      // 将renderobject从child list移除
-      child.detachRenderObject();
-      child.deactivate();
-      // 放入到cache中
-      _elementCache.add(child);
-      print('删除element，当前缓存个数:${_elementCache.length}');
-      return null;
-    } else if (child == null && newWidget != null) {//需要创建element
-
-      // 如果现在时间比较紧张，则使用简单的widget去创建element
-
-      //尝试从cache中获取，参考_retakeInactiveElement的逻辑来编写
-
-      // 遍历cache，获取能使用newWidget更新的element
-      print('需要创建一个element');
-
-      Element? cachedElement;
-      for(int i = 0; i < _elementCache.length; i++) {
-        //如果最后一个都还未找到，直接使用
-        if (i == _elementCache.length - 1) {
-          cachedElement = _elementCache.removeAt(_elementCache.length - 1);
-
-        } else if (Widget.canUpdate(_elementCache[i].widget, newWidget)) {//尽量寻找可以更新的
-          cachedElement = _elementCache.removeAt(i);
-          break;
-        }
+    // return super.updateChild(child, newWidget, newSlot);
+    print('========================开始 index：$newSlot');
+    SchedulerBinding.instance!.addPostFrameCallback((timeStamp) {
+      _canUseOrigin = true;
+      print('帧结束');
+      if (_placeHolderNum > 0) {
+        // 有holer还未替换的情况下，表示还需要刷新帧
+        markNeedsBuild();
       }
+    });
 
-      //未找到，则直接使用原来的方法创建一个
-      if (cachedElement == null) {
-        //确定使用原来的还是替换了，使用简单的widget
-        // if (_hasSufficientTime()) {
-        //   // 还是使用原来的配置
-        //   print('使用原来的配置');
-        // } else {
-        //   print('使用简单的配置');
-        //   // 使用简单的配置widget
-        //   WSliverChildBuilderDelegate delegate = widget.delegate as WSliverChildBuilderDelegate;
-        //   newWidget = delegate.buildPlaceHolder(this, newSlot);
-        //   //因为使用站位的配置，所以这里标记还需要刷新
-        //   // markNeedsBuild();
-        //   SchedulerBinding.instance!.addPostFrameCallback((timeStamp) {
-        //     markNeedsBuild();
-        //   });
-        // }
-
-        if (!_shouldPlaceHolder) {
-          _shouldPlaceHolder = true;
-          print('使用原来的配置');
-        } else {
-          print('使用简单的配置');
-          WSliverChildBuilderDelegate delegate = widget.delegate as WSliverChildBuilderDelegate;
-          newWidget = delegate.buildPlaceHolder(this, newSlot);
-          if (!_placeHolders.contains(newSlot)) {
-            _placeHolders.add(newSlot);
-          }
-          SchedulerBinding.instance!.addPostFrameCallback((timeStamp) {
-            markNeedsBuild();
-            _shouldPlaceHolder = false;
-            print('一帧结束');
-          });
-        }
-
+    if (child != null && newWidget == null) {
+      //删除element
+      print('需要删除element');
+      if (_placeHolderMap[newSlot] ?? false) {
+        _placeHolderNum--;
+      }
+      _placeHolderMap[newSlot] = false;
+      return super.updateChild(child, newWidget, newSlot);
+    } else if (child == null && newWidget != null) {
+      print('需要创建element');
+      //需要创建element
+      if (_canUseOrigin) {
+        _canUseOrigin = false;
+        print('创建element');
         return super.updateChild(child, newWidget, newSlot);
-
-      } else {//找到缓存的element
-        print('使用找到的缓存，当前缓存个数：${_elementCache.length}');
-        cachedElement.attachRenderObject(newSlot);
-        cachedElement.activate();
-        Element? newElement = super.updateChild(cachedElement, newWidget, newSlot);
-        print('从缓存获取到的element：${cachedElement.hashCode}, updateChild更新后返回的element：${newElement?.hashCode}');
-        return newElement;
+      } else {
+        print('创建占位的element');
+        WSliverChildBuilderDelegate delegate =
+            widget.delegate as WSliverChildBuilderDelegate;
+        newWidget = delegate.buildPlaceHolder(this, newSlot);
+        _placeHolderMap[newSlot] = true;
+        _placeHolderNum++;
+        return super.updateChild(child, newWidget, newSlot);
       }
     } else {
-      print('更新element');
-      Element? updatedElement;
-      if (!_placeHolders.contains(newSlot)) {
-        //使用原来的配置更新
-        print('使用原来配置更新element');
+      print('需要更新element');
+      // 更新Element
+      if (_canUseOrigin && (_placeHolderMap[newSlot] ?? false)) {
+        //使用原来的替换占位的
+        print('使用原来的替换占位的');
+        _canUseOrigin = false;
+        _placeHolderMap[newSlot] = false;
+        _placeHolderNum--;
+        return super.updateChild(child, newWidget, newSlot);
       } else {
-        if (!_shouldPlaceHolder) {
-          _placeHolders.remove(newSlot);
-          _shouldPlaceHolder = true;
-          //使用原来的配置更新
-          print('使用原来配置更新element');
-        } else {
-          //还是使用简单的配置更新
-          print('使用简单配置更新element');
-          WSliverChildBuilderDelegate delegate = widget.delegate as WSliverChildBuilderDelegate;
+        if (_placeHolderMap[newSlot] ?? false) {
+          //更新占位的
+          print('更新占位的');
+          WSliverChildBuilderDelegate delegate =
+              widget.delegate as WSliverChildBuilderDelegate;
           newWidget = delegate.buildPlaceHolder(this, newSlot);
-          if (!_placeHolders.contains(newSlot)) {
-            _placeHolders.add(newSlot);
-          }
-
-          SchedulerBinding.instance!.addPostFrameCallback((timeStamp) {
-            _shouldPlaceHolder = false;
-            markNeedsBuild();
-            print('一帧结束');
-          });
+          return super.updateChild(child, newWidget, newSlot);
+        } else {
+          // 更新原来的
+          print('更新原来的');
+          return super.updateChild(child, newWidget, newSlot);
         }
       }
-      updatedElement = super.updateChild(child, newWidget, newSlot);
-
-      return updatedElement;
     }
-
   }
 
   @override
   void insertAndLayoutChildCost(int index, Duration cost) {
-    print('insertAndLayoutChildCost消耗的时间：${cost.inMilliseconds} child的索引：$index');
+    print(
+        'insertAndLayoutChildCost消耗的时间：${cost.inMilliseconds} child的索引：$index');
     //将消耗的时间
     _totalCost += cost.inMilliseconds;
   }
@@ -156,9 +111,9 @@ class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
   @override
   void startLayout() {
     _totalCost = 0;
+    print('==============================================开始布局===========');
   }
 }
-
 
 //=============================================================WSliverList=======================================================================
 
@@ -175,7 +130,8 @@ class WSliverList extends SliverList {
 
   @override
   RenderSliverList createRenderObject(BuildContext context) {
-    final SliverMultiBoxAdaptorElement element = context as SliverMultiBoxAdaptorElement;
+    final SliverMultiBoxAdaptorElement element =
+        context as SliverMultiBoxAdaptorElement;
     return WRenderSliverList(childManager: element);
   }
 }
@@ -191,10 +147,8 @@ class WRenderSliverList extends RenderSliverList {
     _childManager = childManager as WRenderSliverBoxChildManager;
   }
 
-
   @override
   bool addInitialChild({int index = 0, double layoutOffset = 0.0}) {
-
     DateTime pre = DateTime.now();
     bool? res = super.addInitialChild(index: index, layoutOffset: layoutOffset);
     DateTime now = DateTime.now();
@@ -204,11 +158,12 @@ class WRenderSliverList extends RenderSliverList {
     return res;
   }
 
-
   @override
-  RenderBox? insertAndLayoutChild(BoxConstraints childConstraints, {required RenderBox? after, bool parentUsesSize = false}) {
+  RenderBox? insertAndLayoutChild(BoxConstraints childConstraints,
+      {required RenderBox? after, bool parentUsesSize = false}) {
     DateTime pre = DateTime.now();
-    RenderBox? child = super.insertAndLayoutChild(childConstraints, after: after, parentUsesSize: parentUsesSize );
+    RenderBox? child = super.insertAndLayoutChild(childConstraints,
+        after: after, parentUsesSize: parentUsesSize);
     DateTime now = DateTime.now();
     //计算插入和布局一个child所消耗的时间
     Duration diff = now.difference(pre);
@@ -219,9 +174,11 @@ class WRenderSliverList extends RenderSliverList {
   }
 
   @override
-  RenderBox? insertAndLayoutLeadingChild(BoxConstraints childConstraints, {bool parentUsesSize = false}) {
+  RenderBox? insertAndLayoutLeadingChild(BoxConstraints childConstraints,
+      {bool parentUsesSize = false}) {
     DateTime pre = DateTime.now();
-    RenderBox? child = super.insertAndLayoutLeadingChild(childConstraints, parentUsesSize: parentUsesSize);
+    RenderBox? child = super.insertAndLayoutLeadingChild(childConstraints,
+        parentUsesSize: parentUsesSize);
     DateTime now = DateTime.now();
     //计算插入和布局一个child所消耗的时间
     Duration diff = now.difference(pre);
@@ -245,15 +202,14 @@ class WRenderSliverList extends RenderSliverList {
 
 //=============================================================WRenderSliverBoxChildManager=======================================================================
 // 增强的能力
-abstract class WRenderSliverBoxChildManager extends RenderSliverBoxChildManager {
-
+abstract class WRenderSliverBoxChildManager
+    extends RenderSliverBoxChildManager {
   /// 增加和布局一个child所消耗的时间
-  void insertAndLayoutChildCost(int index,Duration cost);
+  void insertAndLayoutChildCost(int index, Duration cost);
+
   /// 布局开始的回调
   void startLayout();
-
 }
-
 
 //=====================================================================WListView===============================================================
 class WListView extends BoxScrollView {
@@ -295,31 +251,32 @@ class WListView extends BoxScrollView {
     List<Widget> children = const <Widget>[],
     int? semanticChildCount,
     DragStartBehavior dragStartBehavior = DragStartBehavior.start,
-    ScrollViewKeyboardDismissBehavior keyboardDismissBehavior = ScrollViewKeyboardDismissBehavior.manual,
+    ScrollViewKeyboardDismissBehavior keyboardDismissBehavior =
+        ScrollViewKeyboardDismissBehavior.manual,
     String? restorationId,
     Clip clipBehavior = Clip.hardEdge,
-  }) : childrenDelegate = SliverChildListDelegate(
-    children,
-    addAutomaticKeepAlives: addAutomaticKeepAlives,
-    addRepaintBoundaries: addRepaintBoundaries,
-    addSemanticIndexes: addSemanticIndexes,
-  ),
+  })  : childrenDelegate = SliverChildListDelegate(
+          children,
+          addAutomaticKeepAlives: addAutomaticKeepAlives,
+          addRepaintBoundaries: addRepaintBoundaries,
+          addSemanticIndexes: addSemanticIndexes,
+        ),
         super(
-        key: key,
-        scrollDirection: scrollDirection,
-        reverse: reverse,
-        controller: controller,
-        primary: primary,
-        physics: physics,
-        shrinkWrap: shrinkWrap,
-        padding: padding,
-        cacheExtent: cacheExtent,
-        semanticChildCount: semanticChildCount ?? children.length,
-        dragStartBehavior: dragStartBehavior,
-        keyboardDismissBehavior: keyboardDismissBehavior,
-        restorationId: restorationId,
-        clipBehavior: clipBehavior,
-      );
+          key: key,
+          scrollDirection: scrollDirection,
+          reverse: reverse,
+          controller: controller,
+          primary: primary,
+          physics: physics,
+          shrinkWrap: shrinkWrap,
+          padding: padding,
+          cacheExtent: cacheExtent,
+          semanticChildCount: semanticChildCount ?? children.length,
+          dragStartBehavior: dragStartBehavior,
+          keyboardDismissBehavior: keyboardDismissBehavior,
+          restorationId: restorationId,
+          clipBehavior: clipBehavior,
+        );
 
   /// Creates a scrollable, linear array of widgets that are created on demand.
   ///
@@ -370,10 +327,11 @@ class WListView extends BoxScrollView {
     double? cacheExtent,
     int? semanticChildCount,
     DragStartBehavior dragStartBehavior = DragStartBehavior.start,
-    ScrollViewKeyboardDismissBehavior keyboardDismissBehavior = ScrollViewKeyboardDismissBehavior.manual,
+    ScrollViewKeyboardDismissBehavior keyboardDismissBehavior =
+        ScrollViewKeyboardDismissBehavior.manual,
     String? restorationId,
     Clip clipBehavior = Clip.hardEdge,
-  }) : assert(itemCount == null || itemCount >= 0),
+  })  : assert(itemCount == null || itemCount >= 0),
         assert(semanticChildCount == null || semanticChildCount <= itemCount!),
         childrenDelegate = WSliverChildBuilderDelegate(
           null,
@@ -384,21 +342,21 @@ class WListView extends BoxScrollView {
           addSemanticIndexes: addSemanticIndexes,
         ),
         super(
-        key: key,
-        scrollDirection: scrollDirection,
-        reverse: reverse,
-        controller: controller,
-        primary: primary,
-        physics: physics,
-        shrinkWrap: shrinkWrap,
-        padding: padding,
-        cacheExtent: cacheExtent,
-        semanticChildCount: semanticChildCount ?? itemCount,
-        dragStartBehavior: dragStartBehavior,
-        keyboardDismissBehavior: keyboardDismissBehavior,
-        restorationId: restorationId,
-        clipBehavior: clipBehavior,
-      );
+          key: key,
+          scrollDirection: scrollDirection,
+          reverse: reverse,
+          controller: controller,
+          primary: primary,
+          physics: physics,
+          shrinkWrap: shrinkWrap,
+          padding: padding,
+          cacheExtent: cacheExtent,
+          semanticChildCount: semanticChildCount ?? itemCount,
+          dragStartBehavior: dragStartBehavior,
+          keyboardDismissBehavior: keyboardDismissBehavior,
+          restorationId: restorationId,
+          clipBehavior: clipBehavior,
+        );
 
   /// Creates a fixed-length scrollable linear array of list "items" separated
   /// by list item "separators".
@@ -464,15 +422,16 @@ class WListView extends BoxScrollView {
     bool addSemanticIndexes = true,
     double? cacheExtent,
     DragStartBehavior dragStartBehavior = DragStartBehavior.start,
-    ScrollViewKeyboardDismissBehavior keyboardDismissBehavior = ScrollViewKeyboardDismissBehavior.manual,
+    ScrollViewKeyboardDismissBehavior keyboardDismissBehavior =
+        ScrollViewKeyboardDismissBehavior.manual,
     String? restorationId,
     Clip clipBehavior = Clip.hardEdge,
-  }) : assert(itemBuilder != null),
+  })  : assert(itemBuilder != null),
         assert(separatorBuilder != null),
         assert(itemCount != null && itemCount >= 0),
         itemExtent = null,
         childrenDelegate = SliverChildBuilderDelegate(
-              (BuildContext context, int index) {
+          (BuildContext context, int index) {
             final int itemIndex = index ~/ 2;
             final Widget widget;
             if (index.isEven) {
@@ -480,7 +439,8 @@ class WListView extends BoxScrollView {
             } else {
               widget = separatorBuilder(context, itemIndex);
               assert(() {
-                if (widget == null) { // ignore: dead_code
+                if (widget == null) {
+                  // ignore: dead_code
                   throw FlutterError('separatorBuilder cannot return null.');
                 }
                 return true;
@@ -497,21 +457,21 @@ class WListView extends BoxScrollView {
           },
         ),
         super(
-        key: key,
-        scrollDirection: scrollDirection,
-        reverse: reverse,
-        controller: controller,
-        primary: primary,
-        physics: physics,
-        shrinkWrap: shrinkWrap,
-        padding: padding,
-        cacheExtent: cacheExtent,
-        semanticChildCount: itemCount,
-        dragStartBehavior: dragStartBehavior,
-        keyboardDismissBehavior: keyboardDismissBehavior,
-        restorationId: restorationId,
-        clipBehavior: clipBehavior,
-      );
+          key: key,
+          scrollDirection: scrollDirection,
+          reverse: reverse,
+          controller: controller,
+          primary: primary,
+          physics: physics,
+          shrinkWrap: shrinkWrap,
+          padding: padding,
+          cacheExtent: cacheExtent,
+          semanticChildCount: itemCount,
+          dragStartBehavior: dragStartBehavior,
+          keyboardDismissBehavior: keyboardDismissBehavior,
+          restorationId: restorationId,
+          clipBehavior: clipBehavior,
+        );
 
   /// Creates a scrollable, linear array of widgets with a custom child model.
   ///
@@ -612,26 +572,27 @@ class WListView extends BoxScrollView {
     double? cacheExtent,
     int? semanticChildCount,
     DragStartBehavior dragStartBehavior = DragStartBehavior.start,
-    ScrollViewKeyboardDismissBehavior keyboardDismissBehavior = ScrollViewKeyboardDismissBehavior.manual,
+    ScrollViewKeyboardDismissBehavior keyboardDismissBehavior =
+        ScrollViewKeyboardDismissBehavior.manual,
     String? restorationId,
     Clip clipBehavior = Clip.hardEdge,
-  }) : assert(childrenDelegate != null),
+  })  : assert(childrenDelegate != null),
         super(
-        key: key,
-        scrollDirection: scrollDirection,
-        reverse: reverse,
-        controller: controller,
-        primary: primary,
-        physics: physics,
-        shrinkWrap: shrinkWrap,
-        padding: padding,
-        cacheExtent: cacheExtent,
-        semanticChildCount: semanticChildCount,
-        dragStartBehavior: dragStartBehavior,
-        keyboardDismissBehavior: keyboardDismissBehavior,
-        restorationId: restorationId,
-        clipBehavior: clipBehavior,
-      );
+          key: key,
+          scrollDirection: scrollDirection,
+          reverse: reverse,
+          controller: controller,
+          primary: primary,
+          physics: physics,
+          shrinkWrap: shrinkWrap,
+          padding: padding,
+          cacheExtent: cacheExtent,
+          semanticChildCount: semanticChildCount,
+          dragStartBehavior: dragStartBehavior,
+          keyboardDismissBehavior: keyboardDismissBehavior,
+          restorationId: restorationId,
+          clipBehavior: clipBehavior,
+        );
 
   /// If non-null, forces the children to have the given extent in the scroll
   /// direction.
@@ -664,7 +625,8 @@ class WListView extends BoxScrollView {
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties.add(DoubleProperty('itemExtent', itemExtent, defaultValue: null));
+    properties
+        .add(DoubleProperty('itemExtent', itemExtent, defaultValue: null));
   }
 
   // Helper method to compute the actual child count for the separated constructor.
@@ -679,41 +641,39 @@ int _kDefaultSemanticIndexCallback(Widget _, int localIndex) => localIndex;
 
 /// 创建child的代理，增强能力，增加placeholder child的创建
 abstract class WSliverChildDelegate extends SliverChildDelegate {
-
   Widget? buildPlaceHolder(BuildContext context, int index);
 }
 
-
-class WSliverChildBuilderDelegate extends SliverChildBuilderDelegate implements WSliverChildDelegate{
+class WSliverChildBuilderDelegate extends SliverChildBuilderDelegate
+    implements WSliverChildDelegate {
   //不传PlaceHolderBuilder就表示不需要分帧功能
   PlaceHolderBuilder? placeHolderBuilder;
 
-  WSliverChildBuilderDelegate(this.placeHolderBuilder, builder, {
-    ChildIndexGetter? findChildIndexCallback,
-    int? childCount,
-    bool addAutomaticKeepAlives = true,
-    bool addRepaintBoundaries = true,
-    bool addSemanticIndexes = true,
-    SemanticIndexCallback semanticIndexCallback = _kDefaultSemanticIndexCallback,
-    int semanticIndexOffset = 0
-  })
+  WSliverChildBuilderDelegate(this.placeHolderBuilder, builder,
+      {ChildIndexGetter? findChildIndexCallback,
+      int? childCount,
+      bool addAutomaticKeepAlives = true,
+      bool addRepaintBoundaries = true,
+      bool addSemanticIndexes = true,
+      SemanticIndexCallback semanticIndexCallback =
+          _kDefaultSemanticIndexCallback,
+      int semanticIndexOffset = 0})
       : super(builder,
-      findChildIndexCallback: findChildIndexCallback,
-    childCount: childCount,
-    addAutomaticKeepAlives: addAutomaticKeepAlives,
-    addRepaintBoundaries: addRepaintBoundaries,
-    addSemanticIndexes: addSemanticIndexes,
-    semanticIndexCallback: semanticIndexCallback,
-    semanticIndexOffset: semanticIndexOffset
-  );
+            findChildIndexCallback: findChildIndexCallback,
+            childCount: childCount,
+            addAutomaticKeepAlives: addAutomaticKeepAlives,
+            addRepaintBoundaries: addRepaintBoundaries,
+            addSemanticIndexes: addSemanticIndexes,
+            semanticIndexCallback: semanticIndexCallback,
+            semanticIndexOffset: semanticIndexOffset);
 
   @override
   Widget? buildPlaceHolder(BuildContext context, int index) {
     Widget? widget = placeHolderBuilder?.call(context, index);
-    if (widget == null) return SizedBox(
-      height: 100,
-    );
+    if (widget == null)
+      return SizedBox(
+        height: 300,
+      );
     return widget;
   }
-
 }
