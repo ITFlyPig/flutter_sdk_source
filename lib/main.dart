@@ -80,7 +80,7 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        child: OutlinedButton(
+        child: RawMaterialButton(
           child: Text('点击'),
           onPressed: () {
             Navigator.of(context).push(new MaterialPageRoute(builder: (_) {
