@@ -1,8 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-
-import 'cache/cache_sliver.dart';
+import 'package:flutter_app/famev2/framev2.dart';
 
 class ListViewTestPage extends StatefulWidget {
   @override
@@ -36,9 +35,12 @@ class _ListViewTestPageState extends State<ListViewTestPage> {
     return Material(
       child: Scaffold(
         body: Container(
-          child: WListView.builder(
+          child: ListView.builder(
             itemBuilder: (_, index) {
-              return _buildComplexItem(index);
+              print('itemBuilder:index $index');
+              return Holder(
+                child: _buildComplexItem(index),
+              );
               // return _buildSimpleItem();
             },
             itemCount: _list?.length,
@@ -49,13 +51,25 @@ class _ListViewTestPageState extends State<ListViewTestPage> {
   }
 
   Widget _buildSimpleItem() {
-    return SizedBox(
+    return Container(
       height: 200,
       width: double.infinity,
+      color: Colors.amber,
+      margin: EdgeInsets.all(2),
     );
   }
 
   Widget _buildComplexItem(int index) {
+    // if (index % 2 == 0) {
+    //   return _buildPageView();
+    // } else {
+    //   return _buildNormal(index);
+    // }
+
+    return _buildNormal(index);
+  }
+
+  Widget _buildNormal(int index) {
     return Container(
         color: Colors.black12,
         margin: EdgeInsets.all(10),
@@ -114,7 +128,20 @@ class _ListViewTestPageState extends State<ListViewTestPage> {
                         child: Text('btn:$index'),
                       ),
                       TextField(
-                        decoration: InputDecoration(hintText: 'hint:$index'),
+                        decoration:
+                            InputDecoration(hintText: '输入框hint0:$index'),
+                      ),
+                      TextField(
+                        decoration:
+                            InputDecoration(hintText: '输入框hint1:$index'),
+                      ),
+                      TextField(
+                        decoration:
+                            InputDecoration(hintText: '输入框hint2:$index'),
+                      ),
+                      TextField(
+                        decoration:
+                            InputDecoration(hintText: '输入框hint3:$index'),
                       )
                     ],
                   ),
@@ -135,4 +162,57 @@ class _ListViewTestPageState extends State<ListViewTestPage> {
   String randomImage() {
     return _images[random.nextInt(6)];
   }
+
+  Widget _buildPageView() {
+    return CustomPageView();
+  }
+}
+
+class CustomPageView extends StatelessWidget {
+  final data = <Color?>[
+    Colors.green[50],
+    Colors.green[100],
+    Colors.green[200],
+    Colors.green[300],
+    Colors.green[400],
+    Colors.green[500],
+    Colors.green[600],
+    Colors.green[700],
+    Colors.green[800],
+    Colors.green[900],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 150,
+      child: PageView(
+        onPageChanged: (position) {
+          print(position);
+        },
+        children: data
+            .map((color) => Container(
+                  alignment: Alignment.center,
+                  width: 90,
+                  color: color,
+                  child: Text(
+                    colorString(color),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        shadows: [
+                          Shadow(
+                              color: Colors.black,
+                              offset: Offset(.5, .5),
+                              blurRadius: 2)
+                        ]),
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+  }
+
+  String colorString(Color? color) =>
+      "#${color?.value.toRadixString(16).padLeft(8, '0').toUpperCase()}";
 }

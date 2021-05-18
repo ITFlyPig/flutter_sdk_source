@@ -9,7 +9,7 @@ import 'package:flutter/scheduler.dart';
 
 class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
     implements WRenderSliverBoxChildManager {
-  final List<Element> _elementCache = <Element>[];
+  final List<Element> _elementCache = [];
   int _next = 0;
   bool _shouldPlaceHolder = false;
   List<int> _placeHolders = []; //记录目前使用简单配置创建的index
@@ -31,6 +31,8 @@ class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
     // 如果newWidget未null，表示需要移除对应的element
     // 将移除的element放入到cache
     // return super.updateChild(child, newWidget, newSlot);
+
+    //============================================================================================================
 
     print('========================开始 index：$newSlot');
     SchedulerBinding.instance!.addPostFrameCallback((timeStamp) {
@@ -91,6 +93,51 @@ class SliverMultiBoxAdaptorElementWithCache extends SliverMultiBoxAdaptorElement
         }
       }
     }
+
+    //============================================================================================================
+
+    // if (child != null && newWidget == null) {
+    //   //删除element
+    //   // 将renderobject从child list移除
+    //   child.deactivate();
+    //   child.detachRenderObject();
+    //   // 放入到cache中
+    //   _elementCache.add(child);
+    //   print('删除element，当前缓存个数:${_elementCache.length}');
+    //   return null;
+    // } else if (child == null && newWidget != null) {
+    //   //需要创建element
+    //   //尝试从cache中获取，参考_retakeInactiveElement的逻辑来编写
+    //
+    //   // 遍历cache，获取能使用newWidget更新的element
+    //
+    //   Element? cachedElement;
+    //   for (int i = 0; i < _elementCache.length; i++) {
+    //     //如果最后一个都还未找到，直接使用
+    //     if (Widget.canUpdate(_elementCache[i].widget, newWidget)) {
+    //       //尽量寻找可以更新的
+    //       cachedElement = _elementCache.removeAt(i);
+    //       break;
+    //     }
+    //   }
+    //
+    //   //未找到，则直接使用原来的方法创建一个
+    //   if (cachedElement == null) {
+    //     print('新创建一个element');
+    //     return super.updateChild(child, newWidget, newSlot);
+    //   } else {
+    //     //找到缓存的element
+    //     print('使用找到的缓存创建element，当前缓存个数：${_elementCache.length}');
+    //     cachedElement.activate();
+    //     cachedElement.attachRenderObject(newSlot);
+    //     Element? newElement =
+    //         super.updateChild(cachedElement, newWidget, newSlot);
+    //     return newElement;
+    //   }
+    // } else {
+    //   print('更新element');
+    //   return super.updateChild(child, newWidget, newSlot);
+    // }
   }
 
   @override
