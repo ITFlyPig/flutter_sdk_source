@@ -1,0 +1,7 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+PlatformDispatcher -> GestureBinding:_handlePointerDataPacket:接受平台传递过来的事件
+
+
+@enduml

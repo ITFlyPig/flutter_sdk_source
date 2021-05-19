@@ -1,3 +1,15 @@
+import 'dart:developer';
+import 'dart:io' show Platform;
+import 'dart:ui' as ui show Scene, SceneBuilder, FlutterView;
+import 'dart:ui';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:vector_math/vector_math_64.dart';
+
+import '../RenderBox源码分析.dart';
+
 /// 渲染树的根
 ///
 /// 代表渲染树的总输出surface和处理渲染管道的引导的view。有一个唯一的[RenderBox]类型子代的view，
@@ -117,16 +129,12 @@ class RenderView extends RenderObject
         false); // nobody tells the screen to rotate, the whole rotate() dance is started from our performResize()
   }
 
-  /// Determines the set of render objects located at the given position.
+  /// 决定坐落于给定坐标内的渲染对象集合。
   ///
-  /// Returns true if the given point is contained in this render object or one
-  /// of its descendants. Adds any render objects that contain the point to the
-  /// given hit test result.
+  /// 如果给定的点包含在这个渲染对象或其某个子对象中，则返回true。将任何包含该点的渲染对象添加到给定的测试结果中。
   ///
-  /// The [position] argument is in the coordinate system of the render view,
-  /// which is to say, in logical pixels. This is not necessarily the same
-  /// coordinate system as that expected by the root [Layer], which will
-  /// normally be in physical (device) pixels.
+  /// [Position]参数位于渲染视图的坐标系中，也就是以逻辑像素为单位。这不一定与根[Layer]期望的坐标系相同，
+  /// 根[Layer]通常以物理(设备)像素为单位。
   bool hitTest(HitTestResult result, {required Offset position}) {
     if (child != null)
       child!.hitTest(BoxHitTestResult.wrap(result), position: position);

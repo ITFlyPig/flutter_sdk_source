@@ -218,21 +218,21 @@
 abstract class RenderBox extends RenderObject {
   @override
   void setupParentData(covariant RenderObject child) {
-    if (child.parentData is! BoxParentData)
-      child.parentData = BoxParentData();
+    if (child.parentData is! BoxParentData) child.parentData = BoxParentData();
   }
 
   Map<_IntrinsicDimensionsCacheEntry, double>? _cachedIntrinsicDimensions;
 
   ///计算内在尺寸
-  double _computeIntrinsicDimension(_IntrinsicDimension dimension, double argument, double computer(double argument)) {
+  double _computeIntrinsicDimension(_IntrinsicDimension dimension,
+      double argument, double computer(double argument)) {
     //增加cache的功能，具体的计算逻辑还是computer来实现
     bool shouldCache = true;
     if (shouldCache) {
       _cachedIntrinsicDimensions ??= <_IntrinsicDimensionsCacheEntry, double>{};
       return _cachedIntrinsicDimensions!.putIfAbsent(
         _IntrinsicDimensionsCacheEntry(dimension, argument),
-            () => computer(argument),
+        () => computer(argument),
       );
     }
     return computer(argument);
@@ -251,7 +251,8 @@ abstract class RenderBox extends RenderObject {
   /// 不要复写这个方法，相反的，实现[computeMinIntrinsicWidth]方法
   @mustCallSuper
   double getMinIntrinsicWidth(double height) {
-    return _computeIntrinsicDimension(_IntrinsicDimension.minWidth, height, computeMinIntrinsicWidth);
+    return _computeIntrinsicDimension(
+        _IntrinsicDimension.minWidth, height, computeMinIntrinsicWidth);
   }
 
   /// Computes the value returned by [getMinIntrinsicWidth]. Do not call this
@@ -379,7 +380,8 @@ abstract class RenderBox extends RenderObject {
   /// [computeMaxIntrinsicWidth].
   @mustCallSuper
   double getMaxIntrinsicWidth(double height) {
-    return _computeIntrinsicDimension(_IntrinsicDimension.maxWidth, height, computeMaxIntrinsicWidth);
+    return _computeIntrinsicDimension(
+        _IntrinsicDimension.maxWidth, height, computeMaxIntrinsicWidth);
   }
 
   /// Computes the value returned by [getMaxIntrinsicWidth]. Do not call this
@@ -441,7 +443,8 @@ abstract class RenderBox extends RenderObject {
   /// [computeMinIntrinsicHeight].
   @mustCallSuper
   double getMinIntrinsicHeight(double width) {
-    return _computeIntrinsicDimension(_IntrinsicDimension.minHeight, width, computeMinIntrinsicHeight);
+    return _computeIntrinsicDimension(
+        _IntrinsicDimension.minHeight, width, computeMinIntrinsicHeight);
   }
 
   /// Computes the value returned by [getMinIntrinsicHeight]. Do not call this
@@ -502,7 +505,8 @@ abstract class RenderBox extends RenderObject {
   /// [computeMaxIntrinsicHeight].
   @mustCallSuper
   double getMaxIntrinsicHeight(double width) {
-    return _computeIntrinsicDimension(_IntrinsicDimension.maxHeight, width, computeMaxIntrinsicHeight);
+    return _computeIntrinsicDimension(
+        _IntrinsicDimension.maxHeight, width, computeMaxIntrinsicHeight);
   }
 
   /// Computes the value returned by [getMaxIntrinsicHeight]. Do not call this
@@ -572,13 +576,14 @@ abstract class RenderBox extends RenderObject {
     bool shouldCache = true;
     if (shouldCache) {
       _cachedDryLayoutSizes ??= <BoxConstraints, Size>{};
-      return _cachedDryLayoutSizes!.putIfAbsent(constraints, () => _computeDryLayout(constraints));
+      return _cachedDryLayoutSizes!
+          .putIfAbsent(constraints, () => _computeDryLayout(constraints));
     }
     return _computeDryLayout(constraints);
   }
 
   Size _computeDryLayout(BoxConstraints constraints) {
-    final Size result =  computeDryLayout(constraints);
+    final Size result = computeDryLayout(constraints);
     return result;
   }
 
@@ -655,7 +660,9 @@ abstract class RenderBox extends RenderObject {
   Size get size {
     return _size!;
   }
+
   Size? _size;
+
   /// Setting the size, in checked mode, triggers some analysis of the render box,
   /// as implemented by [debugAssertDoesMeetConstraints], including calling the intrinsic
   /// sizing methods and checking that they meet certain invariants.
@@ -714,10 +721,10 @@ abstract class RenderBox extends RenderObject {
   ///
   /// When implementing a [RenderBox] subclass, to override the baseline
   /// computation, override [computeDistanceToActualBaseline].
-  double? getDistanceToBaseline(TextBaseline baseline, { bool onlyReal = false }) {
+  double? getDistanceToBaseline(TextBaseline baseline,
+      {bool onlyReal = false}) {
     final double? result = getDistanceToActualBaseline(baseline);
-    if (result == null && !onlyReal)
-      return size.height;
+    if (result == null && !onlyReal) return size.height;
     return result;
   }
 
@@ -730,7 +737,8 @@ abstract class RenderBox extends RenderObject {
   @mustCallSuper
   double? getDistanceToActualBaseline(TextBaseline baseline) {
     _cachedBaselines ??= <TextBaseline, double?>{};
-    _cachedBaselines!.putIfAbsent(baseline, () => computeDistanceToActualBaseline(baseline));
+    _cachedBaselines!
+        .putIfAbsent(baseline, () => computeDistanceToActualBaseline(baseline));
     return _cachedBaselines![baseline];
   }
 
@@ -769,13 +777,13 @@ abstract class RenderBox extends RenderObject {
   BoxConstraints get constraints => super.constraints as BoxConstraints;
 
   @override
-  void debugAssertDoesMeetConstraints() {
-  }
+  void debugAssertDoesMeetConstraints() {}
 
   @override
   void markNeedsLayout() {
     if ((_cachedBaselines != null && _cachedBaselines!.isNotEmpty) ||
-        (_cachedIntrinsicDimensions != null && _cachedIntrinsicDimensions!.isNotEmpty) ||
+        (_cachedIntrinsicDimensions != null &&
+            _cachedIntrinsicDimensions!.isNotEmpty) ||
         (_cachedDryLayoutSizes != null && _cachedDryLayoutSizes!.isNotEmpty)) {
       // If we have cached data, then someone must have used our data.
       // Since the parent will shortly be marked dirty, we can forget that they
@@ -806,36 +814,28 @@ abstract class RenderBox extends RenderObject {
   }
 
   @override
-  void performLayout() {
-  }
+  void performLayout() {}
 
-  /// Determines the set of render objects located at the given position.
+  /// 确定位于给定位置的渲染对象集。
   ///
-  /// Returns true, and adds any render objects that contain the point to the
-  /// given hit test result, if this render object or one of its descendants
-  /// absorbs the hit (preventing objects below this one from being hit).
-  /// Returns false if the hit can continue to other objects below this one.
+  /// 如果该渲染对象或其子对象之一吸收了命中(防止命中此对象以下的对象)，则返回TRUE，
+  /// 并将包含该点的任何渲染对象添加到给定的命中测试结果中。如果可以继续命中此对象以下的其他对象，则返回False。
   ///
-  /// The caller is responsible for transforming [position] from global
-  /// coordinates to its location relative to the origin of this [RenderBox].
-  /// This [RenderBox] is responsible for checking whether the given position is
-  /// within its bounds.
+  ///调用方负责将[Position]从全局坐标转换到相对于此[RenderBox]原点的位置。此[RenderBox]
+  ///负责检查给定位置是否在其边界内。
   ///
-  /// If transforming is necessary, [BoxHitTestResult.addWithPaintTransform],
-  /// [BoxHitTestResult.addWithPaintOffset], or
-  /// [BoxHitTestResult.addWithRawTransform] need to be invoked by the caller
-  /// to record the required transform operations in the [HitTestResult]. These
-  /// methods will also help with applying the transform to `position`.
+  /// 如果需要转换，调用方需要调用[BoxHitTestResult.addWithPaintTransform]
+  /// 、[BoxHitTestResult.addWithPaintOffset]或[BoxHitTestResult.addWithRawTransform]
+  /// 在[HitTestResult]中记录所需的转换操作。这些方法还有助于将变换应用于`position`。
   ///
-  /// Hit testing requires layout to be up-to-date but does not require painting
-  /// to be up-to-date. That means a render object can rely upon [performLayout]
-  /// having been called in [hitTest] but cannot rely upon [paint] having been
-  /// called. For example, a render object might be a child of a [RenderOpacity]
-  /// object, which calls [hitTest] on its children when its opacity is zero
-  /// even through it does not [paint] its children.
-  bool hitTest(BoxHitTestResult result, { required Offset position }) {
+  /// 命中测试要求布局是最新的，但不要求绘画是最新的。这意味着渲染对象可以依赖于在[hitTest]中调用了[PerformLayout]，但不能依赖于调用了[Paint]。
+  /// 例如，渲染对象可能是[RenderOpacity]对象的子对象，该对象在其不透明度为零时对其子对象调用[hitTest]，即使它不会[paint]其子对象(children)。
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    // 判断是否包含坐标
     if (_size!.contains(position)) {
-      if (hitTestChildren(result, position: position) || hitTestSelf(position)) {
+      // 如果child或者自己吸收了命中测试，则将自己添加到命中测试结果中
+      if (hitTestChildren(result, position: position) ||
+          hitTestSelf(position)) {
         result.add(BoxHitTestEntry(this, position));
         return true;
       }
@@ -843,47 +843,34 @@ abstract class RenderBox extends RenderObject {
     return false;
   }
 
-  /// Override this method if this render object can be hit even if its
-  /// children were not hit.
+  /// 即使未命中此渲染对象的子对象，但可以命中该渲染对象，则重写此方法。
   ///
-  /// Returns true if the specified `position` should be considered a hit
-  /// on this render object.
+  ///如果指定的`postion`应被视为此渲染对象上的命中，则返回TRUE。
   ///
-  /// The caller is responsible for transforming [position] from global
-  /// coordinates to its location relative to the origin of this [RenderBox].
-  /// This [RenderBox] is responsible for checking whether the given position is
-  /// within its bounds.
+  /// 调用方负责将[Position]从全局坐标转换到相对于此[RenderBox]原点的位置。
+  /// 此[RenderBox]负责检查给定位置是否在其边界内。
   ///
-  /// Used by [hitTest]. If you override [hitTest] and do not call this
-  /// function, then you don't need to implement this function.
+  /// 由[hitTest]使用。如果覆写[hitTest]并且不调用此函数，则不需要实现此函数。
+  ///
   @protected
   bool hitTestSelf(Offset position) => false;
 
-  /// Override this method to check whether any children are located at the
-  /// given position.
+  /// 覆写此方法以检查给定位置是否有children。
   ///
-  /// Subclasses should return true if at least one child reported a hit at the
-  /// specified position.
+  /// 如果至少有一个child报告在指定位置命中，则Subclasses应返回True。
   ///
-  /// Typically children should be hit-tested in reverse paint order so that
-  /// hit tests at locations where children overlap hit the child that is
-  /// visually "on top" (i.e., paints later).
+  ///通常情况下，应该以和绘制顺序相反的方向对child进行命中测试，以便在child重叠的位置进行命中测试，
+  ///从而命中视觉上“在上面”的child(即，稍后进行绘制)。
   ///
-  /// The caller is responsible for transforming [position] from global
-  /// coordinates to its location relative to the origin of this [RenderBox].
-  /// Likewise, this [RenderBox] is responsible for transforming the position
-  /// that it passes to its children when it calls [hitTest] on each child.
+  /// 如果需要转换，subclasses需要调用[BoxHitTestResult.addWithPaintTransform]、
+  /// [BoxHitTestResult.addWithPaintOffset]或[BoxHitTestResult.addWithRawTransform]，
+  /// 将需要的转换操作记录在[BoxHitTestResult]中。这些方法还有助于将转换应用于`position`。
   ///
-  /// If transforming is necessary, [BoxHitTestResult.addWithPaintTransform],
-  /// [BoxHitTestResult.addWithPaintOffset], or
-  /// [BoxHitTestResult.addWithRawTransform] need to be invoked by subclasses to
-  /// record the required transform operations in the [BoxHitTestResult]. These
-  /// methods will also help with applying the transform to `position`.
+  /// 由[hitTest]使用。如果覆写[hitTest]并且不调用此函数，则不需要实现此函数。
   ///
-  /// Used by [hitTest]. If you override [hitTest] and do not call this
-  /// function, then you don't need to implement this function.
   @protected
-  bool hitTestChildren(BoxHitTestResult result, { required Offset position }) => false;
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
+      false;
 
   /// Multiply the transform from the parent's coordinate system to this box's
   /// coordinate system into the given transform.
@@ -916,7 +903,7 @@ abstract class RenderBox extends RenderObject {
   /// object) instead of from the global coordinate system.
   ///
   /// This method is implemented in terms of [getTransformTo].
-  Offset globalToLocal(Offset point, { RenderObject? ancestor }) {
+  Offset globalToLocal(Offset point, {RenderObject? ancestor}) {
     // We want to find point (p) that corresponds to a given point on the
     // screen (s), but that also physically resides on the local render plane,
     // so that it is useful for visually accurate gesture processing in the
@@ -931,12 +918,13 @@ abstract class RenderBox extends RenderObject {
     // with the local X-Y plane: (o-s).dot(n) == (p-s).dot(n), (p-s) == |z|*d.
     final Matrix4 transform = getTransformTo(ancestor);
     final double det = transform.invert();
-    if (det == 0.0)
-      return Offset.zero;
+    if (det == 0.0) return Offset.zero;
     final Vector3 n = Vector3(0.0, 0.0, 1.0);
     final Vector3 i = transform.perspectiveTransform(Vector3(0.0, 0.0, 0.0));
-    final Vector3 d = transform.perspectiveTransform(Vector3(0.0, 0.0, 1.0)) - i;
-    final Vector3 s = transform.perspectiveTransform(Vector3(point.dx, point.dy, 0.0));
+    final Vector3 d =
+        transform.perspectiveTransform(Vector3(0.0, 0.0, 1.0)) - i;
+    final Vector3 s =
+        transform.perspectiveTransform(Vector3(point.dx, point.dy, 0.0));
     final Vector3 p = s - d * (n.dot(s) / n.dot(d));
     return Offset(p.x, p.y);
   }
@@ -951,7 +939,7 @@ abstract class RenderBox extends RenderObject {
   /// This method is implemented in terms of [getTransformTo]. If the transform
   /// matrix puts the given `point` on the line at infinity (for instance, when
   /// the transform matrix is the zero matrix), this method returns (NaN, NaN).
-  Offset localToGlobal(Offset point, { RenderObject? ancestor }) {
+  Offset localToGlobal(Offset point, {RenderObject? ancestor}) {
     return MatrixUtils.transformPoint(getTransformTo(ancestor), point);
   }
 
@@ -1027,12 +1015,9 @@ abstract class RenderBox extends RenderObject {
   @override
   void debugPaint(PaintingContext context, Offset offset) {
     assert(() {
-      if (debugPaintSizeEnabled)
-        debugPaintSize(context, offset);
-      if (debugPaintBaselinesEnabled)
-        debugPaintBaselines(context, offset);
-      if (debugPaintPointersEnabled)
-        debugPaintPointers(context, offset);
+      if (debugPaintSizeEnabled) debugPaintSize(context, offset);
+      if (debugPaintBaselinesEnabled) debugPaintBaselines(context, offset);
+      if (debugPaintPointersEnabled) debugPaintPointers(context, offset);
       return true;
     }());
   }
@@ -1063,7 +1048,8 @@ abstract class RenderBox extends RenderObject {
         ..strokeWidth = 0.25;
       Path path;
       // ideographic baseline
-      final double? baselineI = getDistanceToBaseline(TextBaseline.ideographic, onlyReal: true);
+      final double? baselineI =
+          getDistanceToBaseline(TextBaseline.ideographic, onlyReal: true);
       if (baselineI != null) {
         paint.color = const Color(0xFFFFD000);
         path = Path();
@@ -1072,7 +1058,8 @@ abstract class RenderBox extends RenderObject {
         context.canvas.drawPath(path, paint);
       }
       // alphabetic baseline
-      final double? baselineA = getDistanceToBaseline(TextBaseline.alphabetic, onlyReal: true);
+      final double? baselineA =
+          getDistanceToBaseline(TextBaseline.alphabetic, onlyReal: true);
       if (baselineA != null) {
         paint.color = const Color(0xFF00FF00);
         path = Path();
@@ -1092,13 +1079,12 @@ abstract class RenderBox extends RenderObject {
   /// By default, events are not counted. For details on how to ensure that
   /// events are counted for your class, see [debugHandleEvent].
   @protected
-  void debugPaintPointers(PaintingContext context, Offset offset) {
-  }
+  void debugPaintPointers(PaintingContext context, Offset offset) {}
 
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties.add(DiagnosticsProperty<Size>('size', _size, missingIfNull: true));
+    properties
+        .add(DiagnosticsProperty<Size>('size', _size, missingIfNull: true));
   }
 }
-
