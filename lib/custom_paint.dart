@@ -159,3 +159,33 @@ class BezierPainter extends CustomPainter {
           ..strokeWidth = 2);
   }
 }
+
+class Test extends StatefulWidget {
+  @override
+  _TestState createState() => _TestState();
+}
+
+class _TestState extends State<Test> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this);
+    CurvedAnimation animation =
+        CurvedAnimation(parent: _controller, curve: Curves.bounceIn);
+    animation.addListener(() {});
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container();
+  }
+}

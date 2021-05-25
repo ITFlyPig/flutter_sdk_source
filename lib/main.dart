@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/event_test.dart';
+
+import 'ani_test.dart';
 
 void main() {
   runApp(MyApp());
@@ -50,6 +51,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
+    context.getElementForInheritedWidgetOfExactType();
     // This method is rerun every time setState is called, for instance as done
     // by the _incrementCounter method above.
     //
@@ -74,7 +76,9 @@ class _MyHomePageState extends State<MyHomePage> {
         //     }));
         //   },
         // ),
-        child: EventTest(),
+
+        // child: EventTest(),
+        child: AniTest(),
       ),
     );
   }
