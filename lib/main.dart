@@ -65,21 +65,7 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       // body: ChooseCalendar(start: DateTime.now(), end: DateTime(2021, 5)),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        // child: RawMaterialButton(
-        //   child: Text('点击'),
-        //   onPressed: () {
-        //     Navigator.of(context).push(new MaterialPageRoute(builder: (_) {
-        //       return ListViewTestPage();
-        //     }));
-        //   },
-        // ),
-
-        // child: EventTest(),
-        child: AniTest(),
-      ),
+      body: AniTest(),
     );
   }
 }
